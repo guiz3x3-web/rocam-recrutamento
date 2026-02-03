@@ -151,7 +151,7 @@ const handleFinish = async () => {
 
     setIsFinishing(true);
     try {
-      // SALVA NO FIREBASE ONLINE
+    
       await addDoc(collection(db, "evaluations"), {
         date: new Date().toLocaleString('pt-BR'),
         dateTimestamp: new Date(),
@@ -162,7 +162,7 @@ const handleFinish = async () => {
       });
 
       setShowSuccessToast(true);
-      // RESETA A FICHA
+      
       setState({
         instructors: state.instructors.map(i => ({...i})), 
         candidate: { id: '', name: '' },
