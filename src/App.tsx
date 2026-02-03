@@ -43,7 +43,7 @@ const firebaseConfig = {
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 const App: React.FC = () => { 
-  const [isLogged, setIsLogged] = useState(sessionStorage.getItem('rocam_logged') === 'true');
+  const [isLogged, setIsLogged] = useState(sessionStorage.getItem('rocam_logged') === 'false');
   const [userField, setUserField] = useState('');
   const [passField, setPassField] = useState('');
 
@@ -143,10 +143,40 @@ const App: React.FC = () => {
   const finalScore = categoryScores.total;
   const isApprovedNow = finalScore >= passingGrade;
 
-  const handleFinish = async () => {
+const handleFinish = async () => {
     if (!state.candidate.name || !state.candidate.id) {
       alert("ERRO: Nome e ID do conscrito são obrigatórios.");
       return;
+    }
+
+    setIsFinishing(true);
+    try {
+      // SALVA NO FIREBASE ONLINE
+      await addDoc(collection(db, "evaluations"), {
+        date: new Date().toLocaleString('pt-BR'),
+        dateTimestamp: new Date(),
+        state: JSON.parse(JSON.stringify(state)),
+        finalScore,
+        passingGrade,
+        review: { summary: "Avaliação oficial registrada via Sistema ROCAM." }
+      });
+
+      setShowSuccessToast(true);
+      // RESETA A FICHA
+      setState({
+        instructors: state.instructors.map(i => ({...i})), 
+        candidate: { id: '', name: '' },
+        ramps: defaultRamps.map(r => ({ ...r, score: 0 })),
+        tunnel: { time: '', score: 0 },
+        modulation: { time: '', score: 0 },
+        tracking: defaultTracking.map(t => ({ ...t, score: 0, time: '' })),
+      });
+    } catch (e) {
+      alert("Erro ao salvar no banco de dados!");
+    }
+    setIsFinishing(false);
+    setTimeout(() => setShowSuccessToast(false), 3000);
+  };
     }
 
     setIsFinishing(true);
@@ -220,8 +250,6 @@ const App: React.FC = () => {
     );
   }
 
-  return (
-    <div className="h-screen w-full flex flex-col bg-black text-slate-300 overflow-hidden font-sans select-none">
   return (
     <div className="h-screen w-full flex flex-col bg-black text-slate-300 overflow-hidden font-sans select-none">
       
