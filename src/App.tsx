@@ -399,7 +399,7 @@ useEffect(() => {
                   </div>
                   <div className="text-right">
                     <span className="text-[9px] font-black text-slate-700 uppercase block mb-1 tracking-widest">Média</span>
-                    <input type="number" step="0.5" className="w-12 bg-black border border-white/5 rounded-lg p-1 text-center text-amber-500 text-[10px] font-bold outline-none" value={passingGrade} onChange={e => setPassingGrade(parseFloat(e.target.value) || 0)} />
+                    <input type="number" step="0.5" className="w-12 bg-black border border-white/5 rounded-lg p-1 text-center text-amber-500 text-[10px] font-bold outline-none" value="60" onChange={e => setPassingGrade(parseFloat(e.target.value) || 0)} />
                   </div>
                 </div>
                 <div className={`w-full py-2 rounded-lg border text-center font-black text-[9px] tracking-[0.2em] ${finalScore >= passingGrade ? 'bg-green-500/10 border-green-500/30 text-green-500' : 'bg-red-500/10 border-red-500/30 text-red-500'}`}>
