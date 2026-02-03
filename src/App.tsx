@@ -28,8 +28,33 @@ import {
 } from 'lucide-react';
 import { RecruitmentState, SavedEvaluation, AIReviewResult } from './types';
 import { getAIReview } from './services/geminiService';
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, deleteDoc, doc } from "firebase/firestore";
 
-const App: React.FC = () => {
+const firebaseConfig = {
+  apiKey: "AIzaSyA6l96IKSBHh9Kg10Hb0uXWTqNvH4rEq54",
+  authDomain: "recrutamento-rocam-96e76.firebaseapp.com",
+  projectId: "recrutamento-rocam-96e76",
+  storageBucket: "recrutamento-rocam-96e76.firebasestorage.app",
+  messagingSenderId: "471290475293",
+  appId: "1:471290475293:web:de263909337e633963e7f4"
+};
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+const App: React.FC = () => { 
+  const [isLogged, setIsLogged] = useState(sessionStorage.getItem('rocam_logged') === 'true');
+  const [userField, setUserField] = useState('');
+  const [passField, setPassField] = useState('');
+
+  const handleLogin = () => {
+    if (userField === "instrutor" && passField === "rocam2026") {
+      sessionStorage.setItem('rocam_logged', 'true');
+      setIsLogged(true);
+    } else {
+      alert("Usuário ou Senha incorretos!");
+    }
+  };
   const [activeTab, setActiveTab] = useState<'evaluation' | 'protocols' | 'history'>('evaluation');
   const [passingGrade, setPassingGrade] = useState<number>(7.0);
   const [showSettings, setShowSettings] = useState(false);
@@ -179,6 +204,24 @@ const App: React.FC = () => {
     }
   };
 
+ if (!isLogged) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-black font-sans">
+        <div className="bg-zinc-900/50 border border-amber-500/20 p-10 rounded-[2.5rem] w-full max-w-sm text-center backdrop-blur-md shadow-2xl">
+          <img src="https://i.imgur.com/TXMorwL.png" alt="ROCAM" className="w-20 h-20 mx-auto mb-6 object-contain" />
+          <h2 className="text-amber-500 font-bold tracking-widest text-xl mb-8 uppercase">Acesso Restrito</h2>
+          <div className="space-y-4">
+            <input placeholder="USUÁRIO" className="w-full bg-black border border-white/5 rounded-xl p-3.5 text-[10px] font-black text-white outline-none focus:border-amber-500/50" onChange={e => setUserField(e.target.value)} />
+            <input type="password" placeholder="SENHA" className="w-full bg-black border border-white/5 rounded-xl p-3.5 text-[10px] font-black text-white outline-none focus:border-amber-500/50" onChange={e => setPassField(e.target.value)} />
+            <button onClick={handleLogin} className="w-full py-4 bg-amber-500 text-black rounded-xl font-black text-[10px] tracking-[0.2em] hover:bg-amber-400 mt-4">AUTENTICAR</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-screen w-full flex flex-col bg-black text-slate-300 overflow-hidden font-sans select-none">
   return (
     <div className="h-screen w-full flex flex-col bg-black text-slate-300 overflow-hidden font-sans select-none">
       
