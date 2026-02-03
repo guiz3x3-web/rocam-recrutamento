@@ -48,7 +48,7 @@ const App: React.FC = () => {
   const [passField, setPassField] = useState('');
 
   const handleLogin = () => {
-    if (userField === "instrutor" && passField === "rocam2026") {
+    if (userField === "instrutor" && passField === "seth2026") {
       sessionStorage.setItem('rocam_logged', 'true');
       setIsLogged(true);
     } else {
