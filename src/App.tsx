@@ -148,21 +148,17 @@ const handleFinish = async () => {
       alert("ERRO: Nome e ID do conscrito são obrigatórios.");
       return;
     }
-
     setIsFinishing(true);
     try {
-    
       await addDoc(collection(db, "evaluations"), {
         date: new Date().toLocaleString('pt-BR'),
         dateTimestamp: new Date(),
         state: JSON.parse(JSON.stringify(state)),
         finalScore,
         passingGrade,
-        review: { summary: "Avaliação oficial registrada via Sistema ROCAM." }
+        review: { summary: "Avaliação registrada via Sistema ROCAM." }
       });
-
       setShowSuccessToast(true);
-      
       setState({
         instructors: state.instructors.map(i => ({...i})), 
         candidate: { id: '', name: '' },
@@ -171,70 +167,22 @@ const handleFinish = async () => {
         modulation: { time: '', score: 0 },
         tracking: defaultTracking.map(t => ({ ...t, score: 0, time: '' })),
       });
+      setTimeout(() => setShowSuccessToast(false), 3000);
     } catch (e) {
-      alert("Erro ao salvar no banco de dados!");
-    }
-    setIsFinishing(false);
-    setTimeout(() => setShowSuccessToast(false), 3000);
-  };
-    }
-
-    setIsFinishing(true);
-    
-    const instantReview: AIReviewResult = {
-      summary: "Avaliação registrada no banco de dados local.",
-      strengths: ["Conformidade operacional", "Execução de manobras"],
-      weaknesses: ["Análise detalhada pendente"],
-      verdict: isApprovedNow ? 'APROVADO' : 'REPROVADO'
-    };
-
-    const newEntry: SavedEvaluation = {
-      id: Math.random().toString(36).substring(2, 11),
-      date: new Date().toLocaleString('pt-BR'),
-      state: JSON.parse(JSON.stringify(state)),
-      finalScore,
-      review: instantReview,
-      passingGrade
-    };
-
-    setHistory(prev => [newEntry, ...prev]);
-    setIsFinishing(false);
-    setShowSuccessToast(true);
-    
-    setState({
-      instructors: state.instructors.map(i => ({...i})), 
-      candidate: { id: '', name: '' },
-      ramps: defaultRamps.map(r => ({ ...r, score: 0 })),
-      tunnel: { time: '', score: 0 },
-      modulation: { time: '', score: 0 },
-      tracking: defaultTracking.map(t => ({ ...t, score: 0, time: '' })),
-    });
-
-    setTimeout(() => setShowSuccessToast(false), 3000);
-  };
-
-  const deleteHistoryEntry = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Impede que o clique abra o modal da ficha
-    if (window.confirm("CONFIRMAÇÃO OPERACIONAL: Deseja apagar este registro permanentemente do histórico?")) {
-      setHistory(prev => prev.filter(item => item.id !== id));
+      alert("Erro ao salvar no banco!");
+    } finally {
+      setIsFinishing(false);
     }
   };
 
-  const resetEval = () => {
-    if(window.confirm("Deseja limpar todos os campos da ficha atual?")) {
-      setState({
-        instructors: [{ id: '', name: '' }],
-        candidate: { id: '', name: '' },
-        ramps: defaultRamps.map(r => ({ ...r, score: 0 })),
-        tunnel: { time: '', score: 0 },
-        modulation: { time: '', score: 0 },
-        tracking: defaultTracking.map(t => ({ ...t, score: 0, time: '' })),
-      });
-      setShowSettings(false);
+  const deleteHistoryEntry = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm("Deseja apagar este registro permanentemente?")) {
+      await deleteDoc(doc(db, "evaluations", id));
     }
   };
 
- if (!isLogged) {
+  if (!isLogged) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-black font-sans">
         <div className="bg-zinc-900/50 border border-amber-500/20 p-10 rounded-[2.5rem] w-full max-w-sm text-center backdrop-blur-md shadow-2xl">
