@@ -75,10 +75,15 @@ const App: React.FC = () => {
 
   const defaultRamps = [
     { uid: '1', name: 'RODOVIA PARA O VERMELHO', score: 0 },
-    { uid: '2', name: 'ESCADINHA DO VERMELHO', score: 0 },
+    { uid: '2', name: 'ESCADA DO VERMELHO', score: 0 },
     { uid: '3', name: 'TRILHOS', score: 0 },
     { uid: '4', name: 'ESCADA CONSTRUÇÃO BAIXA P/ RODOVIA', score: 0 },
-    { uid: '5', name: 'SPRITE', score: 0 }
+    { uid: '5', name: 'RAMPA CONSTRUÇÃO BAIXA P/ RODOVIA', score: 0 },
+    { uid: '6', name: 'BENNYS', score: 0 },
+    { uid: '7', name: 'ESCADA BENNYS', score: 0 },
+    { uid: '8', name: 'SPRITE', score: 0 },
+    { uid: '9', name: 'GOLF', score: 0 },
+    { uid: '10', name: 'AMIGAS INVERTIDA', score: 0 }
   ];
 
   const defaultTracking = [
