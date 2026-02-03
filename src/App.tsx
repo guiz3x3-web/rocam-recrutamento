@@ -143,7 +143,24 @@ const App: React.FC = () => {
   const finalScore = categoryScores.total;
   const isApprovedNow = finalScore >= passingGrade;
 
-const handleFinish = async () => {
+useEffect(() => {
+    if (isLogged) {
+      // Cria uma consulta ordenada pela data mais recente
+      const q = query(collection(db, "evaluations"), orderBy("dateTimestamp", "desc"));
+      
+      // Escuta as mudanças em tempo real
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        const items = snapshot.docs.map(doc => ({
+          ...doc.data(),
+          id: doc.id
+        })) as SavedEvaluation[];
+        setHistory(items);
+      });
+
+      return () => unsubscribe();
+    }
+  }, [isLogged]);
+  const handleFinish = async () => {
     if (!state.candidate.name || !state.candidate.id) {
       alert("ERRO: Nome e ID do conscrito são obrigatórios.");
       return;
