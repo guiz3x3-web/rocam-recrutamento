@@ -198,7 +198,32 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, [sessionId]);
 
-  // FUNÇÃO PARA ATUALIZAR E SINCRONIZAR EM TEMPO REAL
+  // FUNÇÃO PARA CRIAR / Mudar para uma nova ficha limpa
+  const handleCreateNewBlankSheet = () => {
+    const newId = 'GTM-' + Math.floor(100 + Math.random() * 900);
+    const cleanState = {
+      instructors: [{ id: '', name: '' }],
+      candidate: { id: '', name: '' },
+      ramps: defaultRamps.map(r => ({ ...r, score: 0 })),
+      tunnel: { time: '', score: 0 },
+      modulation: { time: '', score: 0 },
+      tracking: defaultTracking.map(t => ({ ...t, score: 0, time: '' })),
+    };
+    
+    setSessionId(newId);
+    setState(cleanState);
+    
+    // Regista logo a nova sala no Firebase
+    const cleanSessionId = newId.toUpperCase();
+    set(ref(database, `sessions/${cleanSessionId}`), cleanState);
+    set(ref(database, `active_sessions/${cleanSessionId}`), {
+      candidateName: 'Novo Recrutamento',
+      updatedAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+    });
+
+    setActiveTab('evaluation');
+  };
+
   const updateStateAndSync = (newState: RecruitmentState) => {
     setState(newState);
     if (sessionId.trim()) {
@@ -310,7 +335,6 @@ const App: React.FC = () => {
     setShowSettings(false);
   };
 
-  // BOTÃO SALVAR: Guarda a ficha atual na nuvem sem fechar/remover
   const handleSaveOnly = () => {
     setIsSaving(true);
     updateStateAndSync(state);
@@ -322,7 +346,6 @@ const App: React.FC = () => {
     }, 500);
   };
 
-  // BOTÃO FINALIZAR: Guarda no histórico definitivo e remove dos ativos
   const handleFinish = async () => {
     if (!state.candidate.name || !state.candidate.id) {
       alert("ERRO: Nome e ID do conscrito são obrigatórios para finalizar.");
@@ -485,9 +508,8 @@ const App: React.FC = () => {
             <div className="pt-3 border-t border-white/5 flex gap-3">
               <button 
                 onClick={() => {
-                  const newId = 'GTM-' + Math.floor(100 + Math.random() * 900);
-                  setSessionId(newId);
                   setShowEvaluationsModal(false);
+                  handleCreateNewBlankSheet();
                 }} 
                 className="w-full py-3 bg-amber-500/10 border border-amber-500/30 text-amber-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-500/20 transition-all flex items-center justify-center gap-2"
               >
@@ -605,6 +627,7 @@ const App: React.FC = () => {
         </div>
       )}
 
+      {/* CABEÇALHO COM BOTÃO DE NOVA FICHA DESTACADO */}
       <header className="px-8 py-3 flex items-center justify-between bg-zinc-950 border-b border-amber-500/20 flex-shrink-0 z-50">
         <div className="flex items-center gap-4">
           <img src={gtmLogo} alt="GTM Logo" className="w-10 h-10 object-contain drop-shadow-[0_0_10px_rgba(245,158,11,0.3)]" />
@@ -613,20 +636,32 @@ const App: React.FC = () => {
             <p className="text-[7px] font-black text-slate-400 uppercase tracking-[0.3em] mt-1 italic">Grupamento Tático De Motocicletas</p>
           </div>
         </div>
-        <nav className="flex bg-black p-1 rounded-xl border border-white/5">
-          <button onClick={() => setActiveTab('dashboard')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${activeTab === 'dashboard' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white'}`}>
-            <BarChart3 size={12}/> Dashboard
+
+        <div className="flex items-center gap-3">
+          {/* BOTÃO DESTACADO PARA CRIAR NOVA FICHA */}
+          <button 
+            onClick={handleCreateNewBlankSheet}
+            className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-black rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)] animate-pulse"
+          >
+            <Plus size={14} className="stroke-[3]" /> Nova Ficha
           </button>
-          <button onClick={() => setActiveTab('evaluation')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${activeTab === 'evaluation' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white'}`}>
-            <FileText size={12}/> Avaliação
-          </button>
-          <button onClick={() => setActiveTab('protocols')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${activeTab === 'protocols' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white'}`}>
-            <HelpCircle size={12}/> Perguntas
-          </button>
-          <button onClick={() => setActiveTab('history')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${activeTab === 'history' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white'}`}>
-            <History size={12}/> Histórico
-          </button>
-        </nav>
+
+          <nav className="flex bg-black p-1 rounded-xl border border-white/5">
+            <button onClick={() => setActiveTab('dashboard')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${activeTab === 'dashboard' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white'}`}>
+              <BarChart3 size={12}/> Dashboard
+            </button>
+            <button onClick={() => setActiveTab('evaluation')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${activeTab === 'evaluation' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white'}`}>
+              <FileText size={12}/> Avaliação
+            </button>
+            <button onClick={() => setActiveTab('protocols')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${activeTab === 'protocols' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white'}`}>
+              <HelpCircle size={12}/> Perguntas
+            </button>
+            <button onClick={() => setActiveTab('history')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${activeTab === 'history' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white'}`}>
+              <History size={12}/> Histórico
+            </button>
+          </nav>
+        </div>
+
         <button onClick={() => setShowSettings(true)} className="p-2 text-slate-400 hover:text-amber-500 transition-all">
           <Settings className="w-4 h-4" />
         </button>
@@ -739,7 +774,7 @@ const App: React.FC = () => {
                     )}
                   </div>
 
-                  <button onClick={() => setActiveTab('evaluation')} className="w-full py-3 mt-4 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-lg shadow-amber-500/10 flex items-center justify-center gap-2">
+                  <button onClick={handleCreateNewBlankSheet} className="w-full py-3 mt-4 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-lg shadow-amber-500/10 flex items-center justify-center gap-2">
                     <Plus size={14} /> Abrir Nova Ficha
                   </button>
                 </div>
@@ -843,7 +878,6 @@ const App: React.FC = () => {
                   <input placeholder="ID / PASSAPORTE" className="w-full bg-black/60 border border-white/5 rounded-lg p-2 text-[10px] font-bold outline-none focus:border-amber-500" value={state.candidate.id} onChange={e => updateStateAndSync({...state, candidate: {...state.candidate, id: e.target.value}})} />
                 </section>
 
-                {/* BOTÕES SEPARADOS DE SALVAR E FINALIZAR */}
                 <section className="bg-zinc-900/50 border border-amber-500/20 rounded-[1.2rem] p-4 flex flex-col gap-2.5 mt-auto">
                   <div className="flex justify-between items-center">
                     <div>
