@@ -33,8 +33,22 @@ import {
   Wifi
 } from 'lucide-react';
 import { RecruitmentState, SavedEvaluation, AIReviewResult } from './types';
-import { database } from './firebase';
-import { ref, onValue, set } from 'firebase/database';
+import { initializeApp } from "firebase/app";
+import { getDatabase, ref, onValue, set } from "firebase/database";
+
+// CONFIGURAÇÃO DIRETA DO FIREBASE (EVITA ERROS DE MÓDULO)
+const firebaseConfig = {
+  apiKey: "AIzaSyA6l96IKSBHh9Kg10Hb0uXWTqNvH4rEq54",
+  authDomain: "recrutamento-rocam-96e76.firebaseapp.com",
+  projectId: "recrutamento-rocam-96e76",
+  storageBucket: "recrutamento-rocam-96e76.firebasestorage.app",
+  messagingSenderId: "471290475293",
+  appId: "1:471290475293:web:de263909337e633963e7f4",
+  databaseURL: "https://recrutamento-rocam-96e76-default-rtdb.firebaseio.com"
+};
+
+const app = initializeApp(firebaseConfig);
+const database = getDatabase(app);
 
 const gtmLogo = '/guarnicao_gtm_cinza_camuflado_fundo_transparente_final.png';
 
@@ -98,7 +112,6 @@ const InteractiveTimer: React.FC<TimerButtonProps> = ({ value, onStop }) => {
 };
 
 const App: React.FC = () => {
-  // RECUPERA O LOGIN GUARDADO NO NAVEGADOR PARA NÃO PEDIR SENHA NO F5
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return localStorage.getItem('gtm_logged_in') === 'true';
   });
@@ -255,7 +268,7 @@ const App: React.FC = () => {
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (username.trim() === 'instrutor' && password === 'gtm2026') {
-      localStorage.setItem('gtm_logged_in', 'true'); // GUARDA A CONFIRMAÇÃO DE LOGIN
+      localStorage.setItem('gtm_logged_in', 'true');
       setIsAuthenticated(true);
       setLoginError('');
     } else {
@@ -264,7 +277,7 @@ const App: React.FC = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('gtm_logged_in'); // APAGA A CONFIRMAÇÃO AO CLICAR EM SAIR
+    localStorage.removeItem('gtm_logged_in');
     setIsAuthenticated(false);
     setShowSettings(false);
   };
@@ -337,27 +350,15 @@ const App: React.FC = () => {
       <div className="h-screen w-full flex items-center justify-center bg-[#171717] font-sans select-none relative overflow-hidden">
         <div className="w-full max-w-md p-8 bg-[#1f1f1f] border border-amber-500/40 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col items-center text-center">
           <div className="w-28 h-28 bg-[#121212] border border-white/10 rounded-2xl flex items-center justify-center p-2 mb-4 shadow-inner">
-            <img 
-              src={gtmLogo} 
-              alt="GTM Logo" 
-              className="w-full h-full object-contain" 
-            />
+            <img src={gtmLogo} alt="GTM Logo" className="w-full h-full object-contain" />
           </div>
-          <h1 className="text-2xl font-black text-amber-500 tracking-wider uppercase mb-1">
-            GTM
-          </h1>
-          <h2 className="text-[11px] font-black text-white uppercase tracking-widest mb-1">
-            GRUPAMENTO TÁTICO DE MOTOCICLETAS
-          </h2>
-          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-6">
-            ACESSO RESTRITO
-          </p>
+          <h1 className="text-2xl font-black text-amber-500 tracking-wider uppercase mb-1">GTM</h1>
+          <h2 className="text-[11px] font-black text-white uppercase tracking-widest mb-1">GRUPAMENTO TÁTICO DE MOTOCICLETAS</h2>
+          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-6">ACESSO RESTRITO</p>
 
           <form onSubmit={handleLoginSubmit} className="w-full space-y-4 text-left">
             <div>
-              <label className="block text-[10px] font-black text-amber-500 uppercase tracking-wider mb-1.5">
-                LOGIN
-              </label>
+              <label className="block text-[10px] font-black text-amber-500 uppercase tracking-wider mb-1.5">LOGIN</label>
               <input 
                 type="text" 
                 placeholder="Digite seu usuário" 
@@ -366,11 +367,8 @@ const App: React.FC = () => {
                 className="w-full bg-[#2a2a2a] border border-white/5 rounded-lg py-3 px-4 text-xs text-white placeholder:text-slate-500 focus:border-amber-500 outline-none transition-all"
               />
             </div>
-
             <div>
-              <label className="block text-[10px] font-black text-amber-500 uppercase tracking-wider mb-1.5">
-                SENHA
-              </label>
+              <label className="block text-[10px] font-black text-amber-500 uppercase tracking-wider mb-1.5">SENHA</label>
               <input 
                 type="password" 
                 placeholder="Digite sua senha" 
@@ -379,17 +377,10 @@ const App: React.FC = () => {
                 className="w-full bg-[#2a2a2a] border border-white/5 rounded-lg py-3 px-4 text-xs text-white placeholder:text-slate-500 focus:border-amber-500 outline-none transition-all"
               />
             </div>
-
             {loginError && (
-              <p className="text-[10px] font-bold text-red-500 text-center uppercase tracking-wide">
-                {loginError}
-              </p>
+              <p className="text-[10px] font-bold text-red-500 text-center uppercase tracking-wide">{loginError}</p>
             )}
-
-            <button 
-              type="submit" 
-              className="w-full py-3.5 bg-[#c8922a] hover:bg-[#b07d1f] text-black font-black uppercase text-xs tracking-wider rounded-lg transition-all shadow-md mt-2 flex items-center justify-center gap-2"
-            >
+            <button type="submit" className="w-full py-3.5 bg-[#c8922a] hover:bg-[#b07d1f] text-black font-black uppercase text-xs tracking-wider rounded-lg transition-all shadow-md mt-2 flex items-center justify-center gap-2">
               ENTRAR NO SISTEMA
             </button>
           </form>
@@ -400,11 +391,9 @@ const App: React.FC = () => {
 
   return (
     <div className="h-screen w-full flex flex-col bg-black text-slate-300 overflow-hidden font-sans select-none">
-      
       {showSuccessToast && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[200] bg-amber-500 text-black px-6 py-3 rounded-full font-black uppercase text-[10px] tracking-widest flex items-center gap-3 shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300">
-          <CheckCircle2 size={18} />
-          Avaliação Salva no Histórico GTM!
+          <CheckCircle2 size={18} /> Avaliação Salva no Histórico GTM!
         </div>
       )}
 
@@ -543,54 +532,40 @@ const App: React.FC = () => {
       </header>
 
       <main className="flex-1 overflow-hidden p-4 bg-[radial-gradient(circle_at_center,_#1f1f23_0%,_#09090b_100%)] relative">
-        
         {activeTab === 'dashboard' && (
           <div className="h-full max-w-6xl mx-auto flex flex-col gap-5 overflow-y-auto custom-scrollbar animate-in fade-in duration-500">
-            
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-4 flex items-center justify-between">
                 <div>
                   <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Total Avaliados</span>
                   <div className="text-3xl font-black text-white mt-1">{stats.total}</div>
                 </div>
-                <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-500">
-                  <Users size={20} />
-                </div>
+                <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-500"><Users size={20} /></div>
               </div>
-
               <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-4 flex items-center justify-between">
                 <div>
                   <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Taxa de Aprovação</span>
                   <div className="text-3xl font-black text-green-500 mt-1">{stats.rate}%</div>
                 </div>
-                <div className="p-3 bg-green-500/10 rounded-xl border border-green-500/20 text-green-500">
-                  <TrendingUp size={20} />
-                </div>
+                <div className="p-3 bg-green-500/10 rounded-xl border border-green-500/20 text-green-500"><TrendingUp size={20} /></div>
               </div>
-
               <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-4 flex items-center justify-between">
                 <div>
                   <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Média Geral</span>
                   <div className="text-3xl font-black text-amber-500 mt-1">{stats.avgScore}</div>
                 </div>
-                <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-500">
-                  <Target size={20} />
-                </div>
+                <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-500"><Target size={20} /></div>
               </div>
-
               <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-4 flex items-center justify-between">
                 <div>
                   <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Reprovações</span>
                   <div className="text-3xl font-black text-red-500 mt-1">{stats.rejected}</div>
                 </div>
-                <div className="p-3 bg-red-500/10 rounded-xl border border-red-500/20 text-red-500">
-                  <AlertTriangle size={20} />
-                </div>
+                <div className="p-3 bg-red-500/10 rounded-xl border border-red-500/20 text-red-500"><AlertTriangle size={20} /></div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-              
               <div className="lg:col-span-2 bg-zinc-900/40 border border-white/5 rounded-2xl p-6 flex flex-col justify-between space-y-6">
                 <div className="flex justify-between items-center border-b border-white/5 pb-3">
                   <div>
@@ -708,13 +683,11 @@ const App: React.FC = () => {
                 </div>
               )}
             </div>
-
           </div>
         )}
 
         {activeTab === 'evaluation' && (
           <div className="h-full max-w-full flex flex-col gap-3 animate-in fade-in duration-500 overflow-hidden">
-            
             <div className="bg-zinc-900/60 border border-amber-500/30 rounded-xl px-4 py-2 flex items-center justify-between shadow-md">
               <div className="flex items-center gap-2">
                 <Wifi size={14} className="text-green-500 animate-pulse" />
@@ -732,7 +705,6 @@ const App: React.FC = () => {
             </div>
 
             <div className="flex-1 grid grid-cols-12 gap-4 overflow-hidden">
-              
               <div className="col-span-12 lg:col-span-3 flex flex-col gap-3 overflow-y-auto custom-scrollbar pr-2">
                 <section className="bg-zinc-900/50 border border-amber-500/10 rounded-[1.2rem] p-4 space-y-2.5">
                   <div className="flex justify-between items-center">
@@ -1000,7 +972,6 @@ const App: React.FC = () => {
             </div>
           </div>
         )}
-
       </main>
 
       <footer className="px-8 py-1.5 border-t border-white/5 bg-black text-[6px] font-black text-slate-600 uppercase tracking-[0.4em] text-center flex-shrink-0">
