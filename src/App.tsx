@@ -169,7 +169,6 @@ const App: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
 
-  // ESCUTA A LISTA DE FICHAS ABERTAS NO FIREBASE
   useEffect(() => {
     const listRef = ref(database, 'active_sessions');
     const unsubList = onValue(listRef, (snapshot) => {
@@ -183,7 +182,6 @@ const App: React.FC = () => {
     return () => unsubList();
   }, []);
 
-  // ESCUTA A SALA ATUAL SELECIONADA
   useEffect(() => {
     if (!sessionId.trim()) return;
     const sessionRef = ref(database, `sessions/${sessionId.trim().toUpperCase()}`);
@@ -198,7 +196,6 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, [sessionId]);
 
-  // FUNÇÃO PARA CRIAR / Mudar para uma nova ficha limpa
   const handleCreateNewBlankSheet = () => {
     const newId = 'GTM-' + Math.floor(100 + Math.random() * 900);
     const cleanState = {
@@ -213,7 +210,6 @@ const App: React.FC = () => {
     setSessionId(newId);
     setState(cleanState);
     
-    // Regista logo a nova sala no Firebase
     const cleanSessionId = newId.toUpperCase();
     set(ref(database, `sessions/${cleanSessionId}`), cleanState);
     set(ref(database, `active_sessions/${cleanSessionId}`), {
@@ -393,6 +389,20 @@ const App: React.FC = () => {
     setTimeout(() => setShowSuccessToast(false), 3000);
   };
 
+  // FUNÇÃO PARA APAGAR FICHA ABERTA DA EQUIPE PELO MODAL
+  const handleDeleteActiveSession = (idToDelete: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (window.confirm(`Deseja realmente apagar a ficha da sala ${idToDelete}?`)) {
+      remove(ref(database, `sessions/${idToDelete}`)).catch(err => console.error(err));
+      remove(ref(database, `active_sessions/${idToDelete}`)).catch(err => console.error(err));
+      
+      // Se apagarmos a ficha que está atualmente aberta no ecrã, geramos uma nova em branco
+      if (sessionId.toUpperCase() === idToDelete.toUpperCase()) {
+        handleCreateNewBlankSheet();
+      }
+    }
+  };
+
   const deleteHistoryEntry = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (window.confirm("CONFIRMAÇÃO OPERACIONAL: Deseja apagar este registro permanentemente do histórico?")) {
@@ -468,7 +478,7 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL DE GESTÃO DE FICHAS EM ABERTO */}
+      {/* MODAL DE GESTÃO DE FICHAS EM ABERTO COM BOTÃO LIXINHO */}
       {showEvaluationsModal && (
         <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
           <div className="bg-zinc-950 border border-amber-500/30 p-6 rounded-[2rem] w-full max-w-lg space-y-6 shadow-2xl">
@@ -491,15 +501,24 @@ const App: React.FC = () => {
                       <h4 className="text-xs font-bold text-white uppercase mt-0.5">{info.candidateName}</h4>
                       <span className="text-[7px] text-slate-500 uppercase">Atualizado às {info.updatedAt}</span>
                     </div>
-                    <button 
-                      onClick={() => {
-                        setSessionId(id);
-                        setShowEvaluationsModal(false);
-                      }}
-                      className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase text-[9px] tracking-wider rounded-lg transition-all shadow-md"
-                    >
-                      Aceder Ficha
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => {
+                          setSessionId(id);
+                          setShowEvaluationsModal(false);
+                        }}
+                        className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase text-[9px] tracking-wider rounded-lg transition-all shadow-md"
+                      >
+                        Aceder Ficha
+                      </button>
+                      <button 
+                        onClick={(e) => handleDeleteActiveSession(id, e)}
+                        className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-lg transition-all"
+                        title="Apagar Ficha"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
                 ))
               )}
@@ -638,7 +657,6 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* BOTÃO DESTACADO PARA CRIAR NOVA FICHA */}
           <button 
             onClick={handleCreateNewBlankSheet}
             className="flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-black rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shadow-[0_0_15px_rgba(245,158,11,0.3)] animate-pulse"
