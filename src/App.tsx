@@ -50,7 +50,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
 
-const gtmLogo = 'https://imgur.com/a/6ztkBBp';
+const gtmLogo = 'https://i.imgur.com/HJ1Efmn.jpeg';
 
 interface TimerButtonProps {
   value: string;
