@@ -29,11 +29,13 @@ import {
   AlertTriangle,
   ArrowRight,
   Award,
-  Medal
+  Medal,
+  Wifi
 } from 'lucide-react';
 import { RecruitmentState, SavedEvaluation, AIReviewResult } from './types';
+import { database } from './firebase';
+import { ref, onValue, set } from 'firebase/database';
 
-// Caminho estático direto da pasta public
 const gtmLogo = '/guarnicao_gtm_cinza_camuflado_fundo_transparente_final.png';
 
 interface TimerButtonProps {
@@ -96,7 +98,10 @@ const InteractiveTimer: React.FC<TimerButtonProps> = ({ value, onStop }) => {
 };
 
 const App: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  // RECUPERA O LOGIN GUARDADO NO NAVEGADOR PARA NÃO PEDIR SENHA NO F5
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
+    return localStorage.getItem('gtm_logged_in') === 'true';
+  });
   const [username, setUsername] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [loginError, setLoginError] = useState<string>('');
@@ -109,6 +114,8 @@ const App: React.FC = () => {
   const [expandedProtocol, setExpandedProtocol] = useState<number | null>(null);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   
+  const [sessionId, setSessionId] = useState<string>('GTM-01');
+
   const [history, setHistory] = useState<SavedEvaluation[]>(() => {
     try {
       const saved = localStorage.getItem('gtm_history_v1');
@@ -145,6 +152,28 @@ const App: React.FC = () => {
   const [isFinishing, setIsFinishing] = useState(false);
 
   useEffect(() => {
+    if (!sessionId.trim()) return;
+    const sessionRef = ref(database, `sessions/${sessionId.trim().toUpperCase()}`);
+    
+    const unsubscribe = onValue(sessionRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setState(data);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [sessionId]);
+
+  const updateStateAndSync = (newState: RecruitmentState) => {
+    setState(newState);
+    if (sessionId.trim()) {
+      const sessionRef = ref(database, `sessions/${sessionId.trim().toUpperCase()}`);
+      set(sessionRef, newState).catch(err => console.error("Erro ao sincronizar Firebase:", err));
+    }
+  };
+
+  useEffect(() => {
     localStorage.setItem('gtm_history_v1', JSON.stringify(history));
   }, [history]);
 
@@ -167,7 +196,7 @@ const App: React.FC = () => {
     { level: 'DIFÍCIL', q: 'Posicionamento em "L" na abordagem?', a: 'P1 lateral, P2 diagonal, P3 retaguarda.' },
     { level: 'DIFÍCIL', q: 'Diferença tática no Alto Risco?', a: 'Motos rotacionam no próprio eixo apontando arma, sempre em movimento.' },
     { level: 'DIFÍCIL', q: 'Conduta em COD 5 de invasão?', a: 'Priorizar cerco tático e pontos elevados para cobertura.' },
-    { level: 'DIFÍCIL', q: 'Regra sobre empinar a moto?', a: 'Apenas se o meliante empinar primeiro ou veículo desproporcional..' },
+    { level: 'DIFÍCIL', q: 'Regra sobre empinar a moto?', a: 'Apenas se o meliante empinar primeiro ou veículo desproporcional.' },
     { level: 'DIFÍCIL', q: 'Regra de retorno após queda?', a: 'A decisão de retorno é exclusivamente do suspeito, o oficial nunca pede.' }
   ];
 
@@ -226,11 +255,18 @@ const App: React.FC = () => {
   const handleLoginSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (username.trim() === 'instrutor' && password === 'gtm2026') {
+      localStorage.setItem('gtm_logged_in', 'true'); // GUARDA A CONFIRMAÇÃO DE LOGIN
       setIsAuthenticated(true);
       setLoginError('');
     } else {
       setLoginError('Credenciais inválidas. Verifique o usuário e senha.');
     }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('gtm_logged_in'); // APAGA A CONFIRMAÇÃO AO CLICAR EM SAIR
+    setIsAuthenticated(false);
+    setShowSettings(false);
   };
 
   const handleFinish = async () => {
@@ -261,15 +297,16 @@ const App: React.FC = () => {
     setIsFinishing(false);
     setShowSuccessToast(true);
     
-    setState({
+    const resetState = {
       instructors: state.instructors.map(i => ({...i})), 
       candidate: { id: '', name: '' },
       ramps: defaultRamps.map(r => ({ ...r, score: 0 })),
       tunnel: { time: '', score: 0 },
       modulation: { time: '', score: 0 },
       tracking: defaultTracking.map(t => ({ ...t, score: 0, time: '' })),
-    });
+    };
 
+    updateStateAndSync(resetState);
     setTimeout(() => setShowSuccessToast(false), 3000);
   };
 
@@ -282,14 +319,15 @@ const App: React.FC = () => {
 
   const resetEval = () => {
     if(window.confirm("Deseja limpar todos os campos da ficha atual?")) {
-      setState({
+      const resetState = {
         instructors: [{ id: '', name: '' }],
         candidate: { id: '', name: '' },
         ramps: defaultRamps.map(r => ({ ...r, score: 0 })),
         tunnel: { time: '', score: 0 },
         modulation: { time: '', score: 0 },
         tracking: defaultTracking.map(t => ({ ...t, score: 0, time: '' })),
-      });
+      };
+      updateStateAndSync(resetState);
       setShowSettings(false);
     }
   };
@@ -375,7 +413,7 @@ const App: React.FC = () => {
           <div className="bg-zinc-900 border border-amber-500/30 p-8 rounded-[2rem] w-full max-w-xs space-y-6 shadow-2xl">
             <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Controles do Sistema</h3>
             <button onClick={resetEval} className="w-full py-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all">Zerar Ficha Atual</button>
-            <button onClick={() => setIsAuthenticated(false)} className="w-full py-3 bg-zinc-800 text-amber-500 border border-amber-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-700 transition-all">Sair do Sistema</button>
+            <button onClick={handleLogout} className="w-full py-3 bg-zinc-800 text-amber-500 border border-amber-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-700 transition-all">Sair do Sistema</button>
             <button onClick={() => setShowSettings(false)} className="w-full py-3 bg-white/5 border border-white/10 text-white rounded-xl text-[10px] font-black uppercase tracking-widest">Fechar</button>
           </div>
         </div>
@@ -675,182 +713,201 @@ const App: React.FC = () => {
         )}
 
         {activeTab === 'evaluation' && (
-          <div className="h-full max-w-full grid grid-cols-12 gap-4 animate-in fade-in duration-500 overflow-hidden">
+          <div className="h-full max-w-full flex flex-col gap-3 animate-in fade-in duration-500 overflow-hidden">
             
-            <div className="col-span-12 lg:col-span-3 flex flex-col gap-3 overflow-y-auto custom-scrollbar pr-2">
-              <section className="bg-zinc-900/50 border border-amber-500/10 rounded-[1.2rem] p-4 space-y-2.5">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><Users size={12}/> Instrutores</h3>
-                  <button onClick={() => setState(p => ({...p, instructors: [...p.instructors, {id:'', name:''}]}))} className="p-1 bg-amber-500/10 text-amber-500 rounded-md hover:bg-amber-500/20"><Plus size={10}/></button>
-                </div>
-                {state.instructors.map((ins, idx) => (
-                  <div key={idx} className="space-y-1 group relative">
-                    <input placeholder="NOME INSTRUTOR" className="w-full bg-black/60 border border-white/5 rounded-lg p-2 text-[10px] uppercase font-bold focus:border-amber-500 outline-none" value={ins.name} onChange={e => {
-                      const n = [...state.instructors]; n[idx].name = e.target.value; setState({...state, instructors: n});
-                    }} />
-                    <input placeholder="ID" className="w-full bg-black/60 border border-white/5 rounded-lg p-2 text-[10px] font-bold focus:border-amber-500 outline-none" value={ins.id} onChange={e => {
-                      const n = [...state.instructors]; n[idx].id = e.target.value; setState({...state, instructors: n});
-                    }} />
-                    {state.instructors.length > 1 && (
-                      <button onClick={() => setState(p => ({...p, instructors: p.instructors.filter((_, i) => i !== idx)}))} className="absolute top-0 right-0 p-1 text-slate-800 hover:text-red-500 transition-colors"><X size={8}/></button>
-                    )}
-                  </div>
-                ))}
-              </section>
-
-              <section className="bg-zinc-900/50 border border-amber-500/10 rounded-[1.2rem] p-4 space-y-2.5">
-                <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><User size={12}/> Conscrito</h3>
-                <input placeholder="NOME DO CONSRITO" className="w-full bg-black/60 border border-white/5 rounded-lg p-2 text-[10px] uppercase font-bold outline-none focus:border-amber-500" value={state.candidate.name} onChange={e => setState({...state, candidate: {...state.candidate, name: e.target.value}})} />
-                <input placeholder="ID / PASSAPORTE" className="w-full bg-black/60 border border-white/5 rounded-lg p-2 text-[10px] font-bold outline-none focus:border-amber-500" value={state.candidate.id} onChange={e => setState({...state, candidate: {...state.candidate, id: e.target.value}})} />
-              </section>
-
-              <section className="bg-zinc-900/50 border border-amber-500/20 rounded-[1.2rem] p-5 flex flex-col gap-3 mt-auto">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="text-[9px] font-black text-slate-500 uppercase block mb-1 tracking-widest">Nota Atual</span>
-                    <div className="text-4xl font-sans font-black text-amber-500 tracking-tighter">{finalScore.toFixed(1)}</div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[9px] font-black text-slate-500 uppercase block mb-1 tracking-widest">Média</span>
-                    <input type="number" step="0.5" className="w-12 bg-black border border-amber-500/20 rounded-lg p-1 text-center text-amber-500 text-[10px] font-bold outline-none" value={passingGrade} onChange={e => setPassingGrade(parseFloat(e.target.value) || 0)} />
-                  </div>
-                </div>
-                <div className={`w-full py-2 rounded-lg border text-center font-black text-[9px] tracking-[0.2em] ${finalScore >= passingGrade ? 'bg-green-500/10 border-green-500/30 text-green-500' : 'bg-red-500/10 border-red-500/30 text-red-500'}`}>
-                  {finalScore >= passingGrade ? 'APROVADO' : 'REPROVADO'}
-                </div>
-                <button onClick={handleFinish} disabled={isFinishing} className="w-full py-3 bg-amber-500 text-black rounded-xl font-black uppercase text-[9px] tracking-widest hover:bg-amber-400 disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-500/10">
-                  {isFinishing ? <Loader2 className="animate-spin" size={12}/> : <Shield size={12}/>}
-                  Finalizar e Salvar
-                </button>
-              </section>
+            <div className="bg-zinc-900/60 border border-amber-500/30 rounded-xl px-4 py-2 flex items-center justify-between shadow-md">
+              <div className="flex items-center gap-2">
+                <Wifi size={14} className="text-green-500 animate-pulse" />
+                <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Sincronização em Tempo Real:</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] font-bold text-slate-400 uppercase">CÓDIGO DA SALA:</span>
+                <input 
+                  type="text" 
+                  className="bg-black border border-amber-500/40 rounded px-2 py-1 text-center text-amber-500 font-mono text-[10px] font-black uppercase outline-none focus:border-amber-400 w-28" 
+                  value={sessionId} 
+                  onChange={e => setSessionId(e.target.value.toUpperCase())}
+                />
+              </div>
             </div>
 
-            <div className="col-span-12 lg:col-span-4 flex flex-col gap-4 overflow-hidden">
-              <section className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-5 space-y-3 flex-1 overflow-y-auto custom-scrollbar">
-                <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                  <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><MapPin size={14}/> CIRCUITO DE RAMPAS</h3>
-                  <button onClick={() => setState(p => ({...p, ramps: [...p.ramps, {uid:Math.random().toString(), name:'', score:0}]}))} className="p-1.5 bg-amber-500/10 text-amber-500 rounded-lg hover:bg-amber-500/20 transition-all"><Plus size={12}/></button>
-                </div>
-                <div className="space-y-1.5">
-                  {state.ramps.map((ramp, idx) => (
-                    <div key={ramp.uid} className="flex gap-3 items-center bg-black/60 border border-white/5 rounded-xl p-2.5 group hover:border-amber-500/30 transition-all">
-                      <input placeholder="TESTE DE RAMPA" className="flex-1 bg-transparent text-[8px] font-black uppercase outline-none text-slate-300" value={ramp.name} onChange={e => {
-                        const n = [...state.ramps]; n[idx].name = e.target.value; setState({...state, ramps: n});
+            <div className="flex-1 grid grid-cols-12 gap-4 overflow-hidden">
+              
+              <div className="col-span-12 lg:col-span-3 flex flex-col gap-3 overflow-y-auto custom-scrollbar pr-2">
+                <section className="bg-zinc-900/50 border border-amber-500/10 rounded-[1.2rem] p-4 space-y-2.5">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><Users size={12}/> Instrutores</h3>
+                    <button onClick={() => updateStateAndSync({...state, instructors: [...state.instructors, {id:'', name:''}]})} className="p-1 bg-amber-500/10 text-amber-500 rounded-md hover:bg-amber-500/20"><Plus size={10}/></button>
+                  </div>
+                  {state.instructors.map((ins, idx) => (
+                    <div key={idx} className="space-y-1 group relative">
+                      <input placeholder="NOME INSTRUTOR" className="w-full bg-black/60 border border-white/5 rounded-lg p-2 text-[10px] uppercase font-bold focus:border-amber-500 outline-none" value={ins.name} onChange={e => {
+                        const n = [...state.instructors]; n[idx].name = e.target.value; updateStateAndSync({...state, instructors: n});
                       }} />
-                      <div className="flex items-center gap-1.5 bg-zinc-950 border border-amber-500/40 rounded px-2.5 py-1 shadow-inner">
-                        <span className="text-[8px] font-black text-amber-600 uppercase tracking-tighter">NOTA:</span>
-                        <input type="number" step="0.5" className="w-10 bg-transparent text-center text-amber-400 text-sm font-black outline-none" value={ramp.score || ''} onChange={e => {
-                          const n = [...state.ramps]; n[idx].score = parseFloat(e.target.value) || 0; setState({...state, ramps: n});
-                        }} />
-                      </div>
-                      <button onClick={() => setState(p => ({...p, ramps: p.ramps.filter(r=>r.uid!==ramp.uid)}))} className="text-slate-700 group-hover:text-red-500 transition-colors"><Trash2 size={10}/></button>
+                      <input placeholder="ID" className="w-full bg-black/60 border border-white/5 rounded-lg p-2 text-[10px] font-bold focus:border-amber-500 outline-none" value={ins.id} onChange={e => {
+                        const n = [...state.instructors]; n[idx].id = e.target.value; updateStateAndSync({...state, instructors: n});
+                      }} />
+                      {state.instructors.length > 1 && (
+                        <button onClick={() => updateStateAndSync({...state, instructors: state.instructors.filter((_, i) => i !== idx)})} className="absolute top-0 right-0 p-1 text-slate-800 hover:text-red-500 transition-colors"><X size={8}/></button>
+                      )}
                     </div>
                   ))}
-                </div>
-              </section>
-              <section className="bg-zinc-900/40 border border-white/5 rounded-[1.5rem] p-4 space-y-3">
-                <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-[0.2em] text-center border-b border-white/5 pb-2 flex items-center justify-center gap-2"><Target size={12}/> RESUMO OPERACIONAL</h3>
-                <div className="space-y-1.5">
-                  {[
-                    { label: 'CIRCUITOS', score: categoryScores.tunnel + categoryScores.modulation, icon: <Zap size={10}/> },
-                    { label: 'ACOMPANHAMENTOS', score: categoryScores.tracking, icon: <ClipboardCheck size={10}/> },
-                    { label: 'RAMPAS', score: categoryScores.ramps, icon: <MapPin size={10}/> },
-                  ].map(item => (
-                    <div key={item.label} className="flex justify-between items-center bg-black/40 px-3 py-2 rounded-xl border border-white/5">
-                      <span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter flex items-center gap-2">{item.icon} {item.label}</span>
-                      <span className="text-sm font-black text-amber-500 tabular-nums">{item.score.toFixed(1)}</span>
+                </section>
+
+                <section className="bg-zinc-900/50 border border-amber-500/10 rounded-[1.2rem] p-4 space-y-2.5">
+                  <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><User size={12}/> Conscrito</h3>
+                  <input placeholder="NOME DO CONSRITO" className="w-full bg-black/60 border border-white/5 rounded-lg p-2 text-[10px] uppercase font-bold outline-none focus:border-amber-500" value={state.candidate.name} onChange={e => updateStateAndSync({...state, candidate: {...state.candidate, name: e.target.value}})} />
+                  <input placeholder="ID / PASSAPORTE" className="w-full bg-black/60 border border-white/5 rounded-lg p-2 text-[10px] font-bold outline-none focus:border-amber-500" value={state.candidate.id} onChange={e => updateStateAndSync({...state, candidate: {...state.candidate, id: e.target.value}})} />
+                </section>
+
+                <section className="bg-zinc-900/50 border border-amber-500/20 rounded-[1.2rem] p-5 flex flex-col gap-3 mt-auto">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[9px] font-black text-slate-500 uppercase block mb-1 tracking-widest">Nota Atual</span>
+                      <div className="text-4xl font-sans font-black text-amber-500 tracking-tighter">{finalScore.toFixed(1)}</div>
                     </div>
-                  ))}
-                </div>
-              </section>
-            </div>
-
-            <div className="col-span-12 lg:col-span-5 flex flex-col gap-4 overflow-hidden">
-              <div className="grid grid-cols-2 gap-3 flex-shrink-0">
-                <div className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-4 space-y-2.5">
-                  <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><Zap size={14}/> TUNEL</h3>
-                  
-                  <div className="flex items-center justify-between gap-2 bg-black/60 border border-white/5 rounded-lg px-2.5 py-1.5">
-                    <InteractiveTimer 
-                      value={state.tunnel.time} 
-                      onStop={(formatted) => setState(p => ({...p, tunnel: {...p.tunnel, time: formatted}}))}
-                    />
-                    <input 
-                      placeholder="00:00" 
-                      className="w-full bg-transparent text-[11px] font-black uppercase outline-none text-amber-500 text-right font-mono" 
-                      value={state.tunnel.time} 
-                      onChange={e => setState({...state, tunnel: {...state.tunnel, time: e.target.value}})} 
-                    />
+                    <div className="text-right">
+                      <span className="text-[9px] font-black text-slate-500 uppercase block mb-1 tracking-widest">Média</span>
+                      <input type="number" step="0.5" className="w-12 bg-black border border-amber-500/20 rounded-lg p-1 text-center text-amber-500 text-[10px] font-bold outline-none" value={passingGrade} onChange={e => setPassingGrade(parseFloat(e.target.value) || 0)} />
+                    </div>
                   </div>
-
-                  <div className="bg-zinc-950 border border-amber-500/40 rounded-lg p-1.5 flex items-center justify-between px-2.5">
-                    <span className="text-[8px] font-black text-amber-600 uppercase tracking-tighter">NOTA:</span>
-                    <input type="number" step="0.5" className="flex-1 bg-transparent text-sm font-black outline-none text-amber-400 text-center" value={state.tunnel.score || ''} onChange={e => setState({...state, tunnel: {...state.tunnel, score: parseFloat(e.target.value) || 0}})} />
+                  <div className={`w-full py-2 rounded-lg border text-center font-black text-[9px] tracking-[0.2em] ${finalScore >= passingGrade ? 'bg-green-500/10 border-green-500/30 text-green-500' : 'bg-red-500/10 border-red-500/30 text-red-500'}`}>
+                    {finalScore >= passingGrade ? 'APROVADO' : 'REPROVADO'}
                   </div>
-                </div>
-
-                <div className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-4 space-y-2.5">
-                  <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><Activity size={14}/> MOD. CHINA</h3>
-                  
-                  <div className="flex items-center justify-between gap-2 bg-black/60 border border-white/5 rounded-lg px-2.5 py-1.5">
-                    <InteractiveTimer 
-                      value={state.modulation.time} 
-                      onStop={(formatted) => setState(p => ({...p, modulation: {...p.modulation, time: formatted}}))}
-                    />
-                    <input 
-                      placeholder="00:00" 
-                      className="w-full bg-transparent text-[11px] font-black uppercase outline-none text-amber-500 text-right font-mono" 
-                      value={state.modulation.time} 
-                      onChange={e => setState({...state, modulation: {...state.modulation, time: e.target.value}})} 
-                    />
-                  </div>
-
-                  <div className="bg-zinc-950 border border-amber-500/40 rounded-lg p-1.5 flex items-center justify-between px-2.5">
-                    <span className="text-[8px] font-black text-amber-600 uppercase tracking-tighter">NOTA:</span>
-                    <input type="number" step="0.5" className="flex-1 bg-transparent text-sm font-black outline-none text-amber-400 text-center" value={state.modulation.score || ''} onChange={e => setState({...state, modulation: {...state.modulation, score: parseFloat(e.target.value) || 0}})} />
-                  </div>
-                </div>
+                  <button onClick={handleFinish} disabled={isFinishing} className="w-full py-3 bg-amber-500 text-black rounded-xl font-black uppercase text-[9px] tracking-widest hover:bg-amber-400 disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-500/10">
+                    {isFinishing ? <Loader2 className="animate-spin" size={12}/> : <Shield size={12}/>}
+                    Finalizar e Salvar
+                  </button>
+                </section>
               </div>
 
-              <section className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-5 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
-                <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                  <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><ClipboardCheck size={14}/> ACOMPANHAMENTOS</h3>
-                  <button onClick={() => setState(p => ({...p, tracking: [...p.tracking, {uid:Math.random().toString(), location:'', time:'', score:0}]}))} className="p-1.5 bg-amber-500/10 text-amber-500 rounded-lg hover:bg-amber-500/20 transition-all"><Plus size={12}/></button>
-                </div>
-                <div className="space-y-2.5">
-                  {state.tracking.map((track, idx) => (
-                    <div key={track.uid} className="bg-black/60 border border-white/5 rounded-xl p-3 flex items-center justify-between group transition-all hover:border-amber-500/30">
-                      <div className="flex-1 space-y-1.5">
-                        <input placeholder="SETOR / ROTA" className="w-full bg-transparent text-[10px] font-black uppercase outline-none text-slate-400" value={track.location} onChange={e => {
-                          const n = [...state.tracking]; n[idx].location = e.target.value; setState({...state, tracking: n});
+              <div className="col-span-12 lg:col-span-4 flex flex-col gap-4 overflow-hidden">
+                <section className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-5 space-y-3 flex-1 overflow-y-auto custom-scrollbar">
+                  <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                    <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><MapPin size={14}/> CIRCUITO DE RAMPAS</h3>
+                    <button onClick={() => updateStateAndSync({...state, ramps: [...state.ramps, {uid:Math.random().toString(), name:'', score:0}]})} className="p-1.5 bg-amber-500/10 text-amber-500 rounded-lg hover:bg-amber-500/20 transition-all"><Plus size={12}/></button>
+                  </div>
+                  <div className="space-y-1.5">
+                    {state.ramps.map((ramp, idx) => (
+                      <div key={ramp.uid} className="flex gap-3 items-center bg-black/60 border border-white/5 rounded-xl p-2.5 group hover:border-amber-500/30 transition-all">
+                        <input placeholder="TESTE DE RAMPA" className="flex-1 bg-transparent text-[8px] font-black uppercase outline-none text-slate-300" value={ramp.name} onChange={e => {
+                          const n = [...state.ramps]; n[idx].name = e.target.value; updateStateAndSync({...state, ramps: n});
                         }} />
-                        <div className="flex items-center justify-between gap-2">
-                          <InteractiveTimer 
-                            value={track.time} 
-                            onStop={(formatted) => {
-                              const n = [...state.tracking];
-                              n[idx].time = formatted;
-                              setState({...state, tracking: n});
-                            }}
-                          />
-                          <input placeholder="00:00" className="bg-transparent outline-none text-[11px] text-amber-500 font-mono w-full text-right" value={track.time} onChange={e => {
-                            const n = [...state.tracking]; n[idx].time = e.target.value; setState({...state, tracking: n});
+                        <div className="flex items-center gap-1.5 bg-zinc-950 border border-amber-500/40 rounded px-2.5 py-1 shadow-inner">
+                          <span className="text-[8px] font-black text-amber-600 uppercase tracking-tighter">NOTA:</span>
+                          <input type="number" step="0.5" className="w-10 bg-transparent text-center text-amber-400 text-sm font-black outline-none" value={ramp.score || ''} onChange={e => {
+                            const n = [...state.ramps]; n[idx].score = parseFloat(e.target.value) || 0; updateStateAndSync({...state, ramps: n});
                           }} />
                         </div>
+                        <button onClick={() => updateStateAndSync({...state, ramps: state.ramps.filter(r=>r.uid!==ramp.uid)})} className="text-slate-700 group-hover:text-red-500 transition-colors"><Trash2 size={10}/></button>
                       </div>
-                      <div className="flex items-center gap-3 border-l border-white/5 pl-3 ml-3">
-                        <div className="flex flex-col items-center bg-zinc-950 border border-amber-500/30 rounded py-1.5 px-3 shadow-inner">
-                          <span className="text-[7px] font-black text-amber-600 uppercase mb-0.5 tracking-tighter">NOTA</span>
-                          <input type="number" step="0.5" className="w-10 bg-transparent text-center text-amber-400 text-lg font-black outline-none" value={track.score || ''} onChange={e => {
-                            const n = [...state.tracking]; n[idx].score = parseFloat(e.target.value) || 0; setState({...state, tracking: n});
-                          }} />
-                        </div>
-                        <button onClick={() => setState(p => ({...p, tracking: p.tracking.filter(t=>t.uid!==track.uid)}))} className="text-slate-700 group-hover:text-red-500 transition-colors"><Trash2 size={12}/></button>
+                    ))}
+                  </div>
+                </section>
+                <section className="bg-zinc-900/40 border border-white/5 rounded-[1.5rem] p-4 space-y-3">
+                  <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-[0.2em] text-center border-b border-white/5 pb-2 flex items-center justify-center gap-2"><Target size={12}/> RESUMO OPERACIONAL</h3>
+                  <div className="space-y-1.5">
+                    {[
+                      { label: 'CIRCUITOS', score: categoryScores.tunnel + categoryScores.modulation, icon: <Zap size={10}/> },
+                      { label: 'ACOMPANHAMENTOS', score: categoryScores.tracking, icon: <ClipboardCheck size={10}/> },
+                      { label: 'RAMPAS', score: categoryScores.ramps, icon: <MapPin size={10}/> },
+                    ].map(item => (
+                      <div key={item.label} className="flex justify-between items-center bg-black/40 px-3 py-2 rounded-xl border border-white/5">
+                        <span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter flex items-center gap-2">{item.icon} {item.label}</span>
+                        <span className="text-sm font-black text-amber-500 tabular-nums">{item.score.toFixed(1)}</span>
                       </div>
+                    ))}
+                  </div>
+                </section>
+              </div>
+
+              <div className="col-span-12 lg:col-span-5 flex flex-col gap-4 overflow-hidden">
+                <div className="grid grid-cols-2 gap-3 flex-shrink-0">
+                  <div className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-4 space-y-2.5">
+                    <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><Zap size={14}/> TUNEL</h3>
+                    
+                    <div className="flex items-center justify-between gap-2 bg-black/60 border border-white/5 rounded-lg px-2.5 py-1.5">
+                      <InteractiveTimer 
+                        value={state.tunnel.time} 
+                        onStop={(formatted) => updateStateAndSync({...state, tunnel: {...state.tunnel, time: formatted}})}
+                      />
+                      <input 
+                        placeholder="00:00" 
+                        className="w-full bg-transparent text-[11px] font-black uppercase outline-none text-amber-500 text-right font-mono" 
+                        value={state.tunnel.time} 
+                        onChange={e => updateStateAndSync({...state, tunnel: {...state.tunnel, time: e.target.value}})} 
+                      />
                     </div>
-                  ))}
+
+                    <div className="bg-zinc-950 border border-amber-500/40 rounded-lg p-1.5 flex items-center justify-between px-2.5">
+                      <span className="text-[8px] font-black text-amber-600 uppercase tracking-tighter">NOTA:</span>
+                      <input type="number" step="0.5" className="flex-1 bg-transparent text-sm font-black outline-none text-amber-400 text-center" value={state.tunnel.score || ''} onChange={e => updateStateAndSync({...state, tunnel: {...state.tunnel, score: parseFloat(e.target.value) || 0}})} />
+                    </div>
+                  </div>
+
+                  <div className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-4 space-y-2.5">
+                    <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><Activity size={14}/> MOD. CHINA</h3>
+                    
+                    <div className="flex items-center justify-between gap-2 bg-black/60 border border-white/5 rounded-lg px-2.5 py-1.5">
+                      <InteractiveTimer 
+                        value={state.modulation.time} 
+                        onStop={(formatted) => updateStateAndSync({...state, modulation: {...state.modulation, time: formatted}})}
+                      />
+                      <input 
+                        placeholder="00:00" 
+                        className="w-full bg-transparent text-[11px] font-black uppercase outline-none text-amber-500 text-right font-mono" 
+                        value={state.modulation.time} 
+                        onChange={e => updateStateAndSync({...state, modulation: {...state.modulation, time: e.target.value}})} 
+                      />
+                    </div>
+
+                    <div className="bg-zinc-950 border border-amber-500/40 rounded-lg p-1.5 flex items-center justify-between px-2.5">
+                      <span className="text-[8px] font-black text-amber-600 uppercase tracking-tighter">NOTA:</span>
+                      <input type="number" step="0.5" className="flex-1 bg-transparent text-sm font-black outline-none text-amber-400 text-center" value={state.modulation.score || ''} onChange={e => updateStateAndSync({...state, modulation: {...state.modulation, score: parseFloat(e.target.value) || 0}})} />
+                    </div>
+                  </div>
                 </div>
-              </section>
+
+                <section className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-5 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
+                  <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                    <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><ClipboardCheck size={14}/> ACOMPANHAMENTOS</h3>
+                    <button onClick={() => updateStateAndSync({...state, tracking: [...state.tracking, {uid:Math.random().toString(), location:'', time:'', score:0}]})} className="p-1.5 bg-amber-500/10 text-amber-500 rounded-lg hover:bg-amber-500/20 transition-all"><Plus size={12}/></button>
+                  </div>
+                  <div className="space-y-2.5">
+                    {state.tracking.map((track, idx) => (
+                      <div key={track.uid} className="bg-black/60 border border-white/5 rounded-xl p-3 flex items-center justify-between group transition-all hover:border-amber-500/30">
+                        <div className="flex-1 space-y-1.5">
+                          <input placeholder="SETOR / ROTA" className="w-full bg-transparent text-[10px] font-black uppercase outline-none text-slate-400" value={track.location} onChange={e => {
+                            const n = [...state.tracking]; n[idx].location = e.target.value; updateStateAndSync({...state, tracking: n});
+                          }} />
+                          <div className="flex items-center justify-between gap-2">
+                            <InteractiveTimer 
+                              value={track.time} 
+                              onStop={(formatted) => {
+                                const n = [...state.tracking];
+                                n[idx].time = formatted;
+                                updateStateAndSync({...state, tracking: n});
+                              }}
+                            />
+                            <input placeholder="00:00" className="bg-transparent outline-none text-[11px] text-amber-500 font-mono w-full text-right" value={track.time} onChange={e => {
+                              const n = [...state.tracking]; n[idx].time = e.target.value; updateStateAndSync({...state, tracking: n});
+                            }} />
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 border-l border-white/5 pl-3 ml-3">
+                          <div className="flex flex-col items-center bg-zinc-950 border border-amber-500/30 rounded py-1.5 px-3 shadow-inner">
+                            <span className="text-[7px] font-black text-amber-600 uppercase mb-0.5 tracking-tighter">NOTA</span>
+                            <input type="number" step="0.5" className="w-10 bg-transparent text-center text-amber-400 text-lg font-black outline-none" value={track.score || ''} onChange={e => {
+                              const n = [...state.tracking]; n[idx].score = parseFloat(e.target.value) || 0; updateStateAndSync({...state, tracking: n});
+                            }} />
+                          </div>
+                          <button onClick={() => updateStateAndSync({...state, tracking: state.tracking.filter(t=>t.uid!==track.uid)})} className="text-slate-700 group-hover:text-red-500 transition-colors"><Trash2 size={12}/></button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </div>
             </div>
           </div>
         )}
