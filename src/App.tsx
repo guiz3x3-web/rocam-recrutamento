@@ -178,19 +178,12 @@ const App: React.FC = () => {
       const data = snapshot.val();
       if (data) {
         setActiveEvaluationsList(data);
-        // Se estivermos na aba de avaliação mas a sala atual foi apagada e não há mais nenhuma, joga para o dashboard
-        if (Object.keys(data).length === 0 && activeTab === 'evaluation') {
-          setActiveTab('dashboard');
-        }
       } else {
         setActiveEvaluationsList({});
-        if (activeTab === 'evaluation') {
-          setActiveTab('dashboard');
-        }
       }
     });
     return () => unsubList();
-  }, [activeTab]);
+  }, []);
 
   useEffect(() => {
     const historyRef = ref(database, 'global_history');
@@ -433,7 +426,6 @@ const App: React.FC = () => {
       await remove(ref(database, `sessions/${idToDelete}`)).catch(err => console.error(err));
       await remove(ref(database, `active_sessions/${idToDelete}`)).catch(err => console.error(err));
       
-      // Se a ficha apagada for a que estava aberta, limpa e joga para o dashboard
       if (sessionId.toUpperCase() === idToDelete.toUpperCase()) {
         setActiveTab('dashboard');
       }
