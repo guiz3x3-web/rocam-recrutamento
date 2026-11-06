@@ -1,5 +1,4 @@
-
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Shield, 
   User, 
@@ -15,7 +14,6 @@ import {
   Settings,
   X,
   ChevronDown,
-  BookOpen,
   UserCheck,
   UserX,
   Users,
@@ -24,13 +22,86 @@ import {
   History,
   Eye,
   CheckCircle2,
-  Clock
+  Play,
+  Square,
+  Lock,
+  BarChart3,
+  TrendingUp,
+  AlertTriangle,
+  ArrowRight
 } from 'lucide-react';
 import { RecruitmentState, SavedEvaluation, AIReviewResult } from './types';
-import { getAIReview } from './services/geminiService';
+
+// Importação da logo oficial GTM
+import gtmLogo from './guarnicao_gtm_cinza_camuflado_fundo_transparente_final.png';
+
+// --- COMPONENTE REUTILIZÁVEL DE CRONÔMETRO INTERATIVO ---
+interface TimerButtonProps {
+  value: string;
+  onStop: (formattedTime: string) => void;
+}
+
+const InteractiveTimer: React.FC<TimerButtonProps> = ({ value, onStop }) => {
+  const [isRunning, setIsRunning] = useState(false);
+  const [seconds, setSeconds] = useState(0);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (isRunning) {
+      timerRef.current = setInterval(() => {
+        setSeconds((prev) => prev + 1);
+      }, 1000);
+    } else if (timerRef.current) {
+      clearInterval(timerRef.current);
+    }
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, [isRunning]);
+
+  const toggleTimer = () => {
+    if (isRunning) {
+      setIsRunning(false);
+      const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
+      const secs = (seconds % 60).toString().padStart(2, '0');
+      const formatted = `${mins}:${secs}`;
+      onStop(formatted);
+    } else {
+      setSeconds(0);
+      setIsRunning(true);
+    }
+  };
+
+  const formatDisplay = (secCount: number) => {
+    const mins = Math.floor(secCount / 60).toString().padStart(2, '0');
+    const secs = (secCount % 60).toString().padStart(2, '0');
+    return `${mins}:${secs}`;
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={toggleTimer}
+      title={isRunning ? "Clique para parar e salvar" : "Clique para iniciar o cronômetro"}
+      className={`px-2 py-1 rounded-md text-[10px] font-mono font-black uppercase flex items-center gap-1.5 transition-all shadow-md ${
+        isRunning 
+          ? 'bg-red-500 text-white animate-pulse border border-red-400' 
+          : 'bg-amber-500/20 text-amber-500 hover:bg-amber-500 hover:text-black border border-amber-500/30'
+      }`}
+    >
+      {isRunning ? <Square size={10} className="fill-current" /> : <Play size={10} className="fill-current" />}
+      <span>{isRunning ? formatDisplay(seconds) : (value || '00:00')}</span>
+    </button>
+  );
+};
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'evaluation' | 'protocols' | 'history'>('evaluation');
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [username, setUsername] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [loginError, setLoginError] = useState<string>('');
+
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'evaluation' | 'protocols' | 'history'>('dashboard');
   const [passingGrade, setPassingGrade] = useState<number>(7.0);
   const [showSettings, setShowSettings] = useState(false);
   const [showResultModal, setShowResultModal] = useState(false);
@@ -40,10 +111,10 @@ const App: React.FC = () => {
   
   const [history, setHistory] = useState<SavedEvaluation[]>(() => {
     try {
-      const saved = localStorage.getItem('rocam_history_v1');
+      const saved = localStorage.getItem('gtm_history_v1');
       return saved ? JSON.parse(saved) : [];
     } catch (e) {
-      console.error("Erro ao carregar histórico:", e);
+      console.error("Erro ao carregar histórico GTM:", e);
       return [];
     }
   });
@@ -74,16 +145,16 @@ const App: React.FC = () => {
   const [isFinishing, setIsFinishing] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem('rocam_history_v1', JSON.stringify(history));
+    localStorage.setItem('gtm_history_v1', JSON.stringify(history));
   }, [history]);
 
   const protocols = [
-    { level: 'FÁCIL', q: 'Qual a prioridade principal da ROCAM em acompanhamentos?', a: 'A ROCAM tem prioridade em acompanhamentos à motocicletas.' },
+    { level: 'FÁCIL', q: 'Qual a prioridade principal do GTM em acompanhamentos?', a: 'O GTM tem prioridade em acompanhamentos a motocicletas.' },
     { level: 'FÁCIL', q: 'O que o oficial deve fazer obrigatoriamente após qualquer queda em ocorrência?', a: 'Deverá dar QTA imediato (encerrar a ocorrência).' },
     { level: 'FÁCIL', q: 'É permitido o uso da manobra Roadblock com a motocicleta?', a: 'Não, a utilização da moto como barreira física é totalmente proibida.' },
     { level: 'FÁCIL', q: 'Como deve ser o posicionamento das rodas ao estacionar a moto?', a: 'Ambas as rodas no mesmo lugar, nunca uma em cada.' },
     { level: 'FÁCIL', q: 'Qual o nome da formação padrão de patrulhamento para 3 motos?', a: 'Formação em "Serrote".' },
-    { level: 'FÁCIL', q: 'Quantas motocicletas podem compor, no máximo, uma unidade ROCAM?', a: 'Até três motocicletas (P1, P2 e P3).' },
+    { level: 'FÁCIL', q: 'Quantas motocicletas podem compor, no máximo, uma unidade GTM?', a: 'Até três motocicletas (P1, P2 e P3).' },
     { level: 'FÁCIL', q: 'Quem decide o destino da unidade e ocorrências?', a: 'O P1 (Moto Primária), o piloto mais experiente.' },
     { level: 'MÉDIO', q: 'Se o veículo for um 4 rodas importado, de quem é a prioridade?', a: 'A prioridade é do G.R.R.' },
     { level: 'MÉDIO', q: 'Qual a regra para o patrulhamento diário com garupa?', a: 'É proibido; cada membro deve usar sua própria moto.' },
@@ -92,7 +163,7 @@ const App: React.FC = () => {
     { level: 'MÉDIO', q: 'Modulação de entrada em serviço?', a: 'QAP Central, [Patente] [Nome] em QRV.' },
     { level: 'MÉDIO', q: 'O que o P3 deve priorizar no patrulhamento?', a: 'Cuidar da retaguarda e acatar as ordens do P1.' },
     { level: 'MÉDIO', q: 'O que o P3 prioriza nos becos?', a: 'Adiantamento de saída sem entrar no mesmo beco que P1/P2.' },
-    { level: 'DIFÍCIL', q: 'Concurso para outro grupamento?', a: 'Deve pedir baixa da ROCAM antes, sujeito a exoneração.' },
+    { level: 'DIFÍCIL', q: 'Concurso para outro grupamento?', a: 'Deve pedir baixa do GTM antes, sujeito a exoneração.' },
     { level: 'DIFÍCIL', q: 'Posicionamento em "L" na abordagem?', a: 'P1 lateral, P2 diagonal, P3 retaguarda.' },
     { level: 'DIFÍCIL', q: 'Diferença tática no Alto Risco?', a: 'Motos rotacionam no próprio eixo apontando arma, sempre em movimento.' },
     { level: 'DIFÍCIL', q: 'Conduta em COD 5 de invasão?', a: 'Priorizar cerco tático e pontos elevados para cobertura.' },
@@ -118,6 +189,27 @@ const App: React.FC = () => {
   const finalScore = categoryScores.total;
   const isApprovedNow = finalScore >= passingGrade;
 
+  // Estatísticas para o Dashboard
+  const stats = useMemo(() => {
+    const total = history.length;
+    if (total === 0) return { total: 0, approved: 0, rejected: 0, rate: 0, avgScore: 0 };
+    const approved = history.filter(h => h.finalScore >= h.passingGrade).length;
+    const rejected = total - approved;
+    const rate = Math.round((approved / total) * 100);
+    const avgScore = (history.reduce((acc, h) => acc + h.finalScore, 0) / total).toFixed(1);
+    return { total, approved, rejected, rate, avgScore };
+  }, [history]);
+
+  const handleLoginSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (username.trim() === 'instrutor' && password === 'gtm2026') {
+      setIsAuthenticated(true);
+      setLoginError('');
+    } else {
+      setLoginError('Credenciais inválidas. Verifique o usuário e senha.');
+    }
+  };
+
   const handleFinish = async () => {
     if (!state.candidate.name || !state.candidate.id) {
       alert("ERRO: Nome e ID do conscrito são obrigatórios.");
@@ -127,7 +219,7 @@ const App: React.FC = () => {
     setIsFinishing(true);
     
     const instantReview: AIReviewResult = {
-      summary: "Avaliação registrada no banco de dados local.",
+      summary: "Avaliação registrada no banco de dados operacional GTM.",
       strengths: ["Conformidade operacional", "Execução de manobras"],
       weaknesses: ["Análise detalhada pendente"],
       verdict: isApprovedNow ? 'APROVADO' : 'REPROVADO'
@@ -159,7 +251,7 @@ const App: React.FC = () => {
   };
 
   const deleteHistoryEntry = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Impede que o clique abra o modal da ficha
+    e.stopPropagation();
     if (window.confirm("CONFIRMAÇÃO OPERACIONAL: Deseja apagar este registro permanentemente do histórico?")) {
       setHistory(prev => prev.filter(item => item.id !== id));
     }
@@ -179,21 +271,90 @@ const App: React.FC = () => {
     }
   };
 
+  // --- TELA DE LOGIN ESTILIZADA ---
+  if (!isAuthenticated) {
+    return (
+      <div className="h-screen w-full flex items-center justify-center bg-[#171717] font-sans select-none relative overflow-hidden">
+        <div className="w-full max-w-md p-8 bg-[#1f1f1f] border border-amber-500/40 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col items-center text-center">
+          <div className="w-28 h-28 bg-[#121212] border border-white/10 rounded-2xl flex items-center justify-center p-2 mb-4 shadow-inner">
+            <img 
+              src={gtmLogo} 
+              alt="GTM Logo" 
+              className="w-full h-full object-contain" 
+            />
+          </div>
+          <h1 className="text-2xl font-black text-amber-500 tracking-wider uppercase mb-1">
+            GTM
+          </h1>
+          <h2 className="text-[11px] font-black text-white uppercase tracking-widest mb-1">
+            GRUPAMENTO TÁTICO DE MOTOCICLETAS
+          </h2>
+          <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-6">
+            ACESSO RESTRITO
+          </p>
+
+          <form onSubmit={handleLoginSubmit} className="w-full space-y-4 text-left">
+            <div>
+              <label className="block text-[10px] font-black text-amber-500 uppercase tracking-wider mb-1.5">
+                LOGIN
+              </label>
+              <input 
+                type="text" 
+                placeholder="Digite seu usuário" 
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                className="w-full bg-[#2a2a2a] border border-white/5 rounded-lg py-3 px-4 text-xs text-white placeholder:text-slate-500 focus:border-amber-500 outline-none transition-all"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-black text-amber-500 uppercase tracking-wider mb-1.5">
+                SENHA
+              </label>
+              <input 
+                type="password" 
+                placeholder="Digite sua senha" 
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="w-full bg-[#2a2a2a] border border-white/5 rounded-lg py-3 px-4 text-xs text-white placeholder:text-slate-500 focus:border-amber-500 outline-none transition-all"
+              />
+            </div>
+
+            {loginError && (
+              <p className="text-[10px] font-bold text-red-500 text-center uppercase tracking-wide">
+                {loginError}
+              </p>
+            )}
+
+            <button 
+              type="submit" 
+              className="w-full py-3.5 bg-[#c8922a] hover:bg-[#b07d1f] text-black font-black uppercase text-xs tracking-wider rounded-lg transition-all shadow-md mt-2 flex items-center justify-center gap-2"
+            >
+              ENTRAR NO SISTEMA
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // --- APLICAÇÃO PRINCIPAL LOGADA ---
   return (
     <div className="h-screen w-full flex flex-col bg-black text-slate-300 overflow-hidden font-sans select-none">
       
       {showSuccessToast && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[200] bg-green-500 text-black px-6 py-3 rounded-full font-black uppercase text-[10px] tracking-widest flex items-center gap-3 shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[200] bg-amber-500 text-black px-6 py-3 rounded-full font-black uppercase text-[10px] tracking-widest flex items-center gap-3 shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300">
           <CheckCircle2 size={18} />
-          Avaliação Salva e Ficha Resetada!
+          Avaliação Salva no Histórico GTM!
         </div>
       )}
 
       {showSettings && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-zinc-900 border border-white/10 p-8 rounded-[2rem] w-full max-w-xs space-y-6 shadow-2xl">
+          <div className="bg-zinc-900 border border-amber-500/30 p-8 rounded-[2rem] w-full max-w-xs space-y-6 shadow-2xl">
             <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Controles do Sistema</h3>
             <button onClick={resetEval} className="w-full py-3 bg-red-500/10 border border-red-500/20 text-red-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all">Zerar Ficha Atual</button>
+            <button onClick={() => setIsAuthenticated(false)} className="w-full py-3 bg-zinc-800 text-amber-500 border border-amber-500/20 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-zinc-700 transition-all">Sair do Sistema</button>
             <button onClick={() => setShowSettings(false)} className="w-full py-3 bg-white/5 border border-white/10 text-white rounded-xl text-[10px] font-black uppercase tracking-widest">Fechar</button>
           </div>
         </div>
@@ -205,7 +366,7 @@ const App: React.FC = () => {
             <div className="p-6 border-b border-white/5 flex justify-between items-center bg-zinc-900/30">
               <div className="flex items-center gap-3">
                 <Shield className="text-amber-500 w-6 h-6" />
-                <h2 className="text-lg font-military font-bold tracking-widest uppercase">Ficha de Recrutamento</h2>
+                <h2 className="text-lg font-military font-bold tracking-widest uppercase">Ficha de Recrutamento GTM</h2>
               </div>
               <button onClick={() => setShowResultModal(false)} className="hover:bg-white/10 p-2 rounded-full transition-colors text-slate-500"><X /></button>
             </div>
@@ -295,36 +456,211 @@ const App: React.FC = () => {
         </div>
       )}
 
-      <header className="px-8 py-3 flex items-center justify-between bg-zinc-950 border-b border-white/5 flex-shrink-0 z-50">
+      {/* HEADER DA APLICAÇÃO */}
+      <header className="px-8 py-3 flex items-center justify-between bg-zinc-950 border-b border-amber-500/20 flex-shrink-0 z-50">
         <div className="flex items-center gap-4">
-          <img src="https://i.imgur.com/TXMorwL.png" alt="ROCAM" className="w-10 h-10 object-contain" />
+          <img src={gtmLogo} alt="GTM Logo" className="w-10 h-10 object-contain drop-shadow-[0_0_10px_rgba(245,158,11,0.3)]" />
           <div>
-            <h1 className="text-base font-military font-bold text-amber-500 tracking-widest leading-none uppercase">ROCAM</h1>
-            <p className="text-[7px] font-black text-slate-700 uppercase tracking-[0.3em] mt-1 italic">Rondas Ostensivas com Apoio de Motocicletas</p>
+            <h1 className="text-base font-military font-bold text-amber-500 tracking-widest leading-none uppercase">GTM</h1>
+            <p className="text-[7px] font-black text-slate-400 uppercase tracking-[0.3em] mt-1 italic">Grupamento Tático De Motocicletas</p>
           </div>
         </div>
         <nav className="flex bg-black p-1 rounded-xl border border-white/5">
-          <button onClick={() => setActiveTab('evaluation')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${activeTab === 'evaluation' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-600 hover:text-white'}`}>
+          <button onClick={() => setActiveTab('dashboard')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${activeTab === 'dashboard' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white'}`}>
+            <BarChart3 size={12}/> Dashboard
+          </button>
+          <button onClick={() => setActiveTab('evaluation')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${activeTab === 'evaluation' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white'}`}>
             <FileText size={12}/> Avaliação
           </button>
-          <button onClick={() => setActiveTab('protocols')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${activeTab === 'protocols' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-600 hover:text-white'}`}>
+          <button onClick={() => setActiveTab('protocols')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${activeTab === 'protocols' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white'}`}>
             <HelpCircle size={12}/> Perguntas
           </button>
-          <button onClick={() => setActiveTab('history')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${activeTab === 'history' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-600 hover:text-white'}`}>
+          <button onClick={() => setActiveTab('history')} className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${activeTab === 'history' ? 'bg-amber-500 text-black shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:text-white'}`}>
             <History size={12}/> Histórico
           </button>
         </nav>
-        <button onClick={() => setShowSettings(true)} className="p-2 text-white/10 hover:text-amber-500/40 transition-all">
+        <button onClick={() => setShowSettings(true)} className="p-2 text-slate-400 hover:text-amber-500 transition-all">
           <Settings className="w-4 h-4" />
         </button>
       </header>
 
-      <main className="flex-1 overflow-hidden p-4 bg-[radial-gradient(circle_at_center,_#111_0%,_#000_100%)] relative">
+      <main className="flex-1 overflow-hidden p-4 bg-[radial-gradient(circle_at_center,_#1f1f23_0%,_#09090b_100%)] relative">
         
+        {/* TAB DASHBOARD / INÍCIO */}
+        {activeTab === 'dashboard' && (
+          <div className="h-full max-w-6xl mx-auto flex flex-col gap-5 overflow-y-auto custom-scrollbar animate-in fade-in duration-500">
+            
+            {/* CARDS KPI SUPERIORES */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Total Avaliados</span>
+                  <div className="text-3xl font-black text-white mt-1">{stats.total}</div>
+                </div>
+                <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-500">
+                  <Users size={20} />
+                </div>
+              </div>
+
+              <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Taxa de Aprovação</span>
+                  <div className="text-3xl font-black text-green-500 mt-1">{stats.rate}%</div>
+                </div>
+                <div className="p-3 bg-green-500/10 rounded-xl border border-green-500/20 text-green-500">
+                  <TrendingUp size={20} />
+                </div>
+              </div>
+
+              <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Média Geral</span>
+                  <div className="text-3xl font-black text-amber-500 mt-1">{stats.avgScore}</div>
+                </div>
+                <div className="p-3 bg-amber-500/10 rounded-xl border border-amber-500/20 text-amber-500">
+                  <Target size={20} />
+                </div>
+              </div>
+
+              <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-4 flex items-center justify-between">
+                <div>
+                  <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Reprovações</span>
+                  <div className="text-3xl font-black text-red-500 mt-1">{stats.rejected}</div>
+                </div>
+                <div className="p-3 bg-red-500/10 rounded-xl border border-red-500/20 text-red-500">
+                  <AlertTriangle size={20} />
+                </div>
+              </div>
+            </div>
+
+            {/* SEÇÃO PRINCIPAL: GRÁFICO DE RECRUTAMENTOS E PONTOS CRÍTICOS */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+              
+              {/* GRÁFICO VISUAL DE RECRUTAMENTO */}
+              <div className="lg:col-span-2 bg-zinc-900/40 border border-white/5 rounded-2xl p-6 flex flex-col justify-between space-y-6">
+                <div className="flex justify-between items-center border-b border-white/5 pb-3">
+                  <div>
+                    <h3 className="text-xs font-black text-amber-500 uppercase tracking-widest">Desempenho dos Recrutamentos</h3>
+                    <p className="text-[9px] text-slate-500 uppercase tracking-wider">Comparativo de aprovações por volume</p>
+                  </div>
+                  <div className="flex items-center gap-4 text-[9px] font-bold">
+                    <span className="flex items-center gap-1 text-green-500"><span className="w-2 h-2 rounded-full bg-green-500"></span> Aprovados ({stats.approved})</span>
+                    <span className="flex items-center gap-1 text-red-500"><span className="w-2 h-2 rounded-full bg-red-500"></span> Reprovados ({stats.rejected})</span>
+                  </div>
+                </div>
+
+                {/* SIMULAÇÃO DE BARRAS DE ANALYTICS TECH */}
+                <div className="h-48 flex items-end justify-between gap-4 pt-6 px-4 border-b border-white/5">
+                  {['SET', 'OUT', 'NOV', 'DEZ'].map((month, idx) => {
+                    const approvedHeight = idx === 2 ? (stats.approved ? Math.min(stats.approved * 20, 100) : 40) : (idx + 1) * 20;
+                    const rejectedHeight = idx === 2 ? (stats.rejected ? Math.min(stats.rejected * 20, 80) : 20) : (idx + 1) * 10;
+                    return (
+                      <div key={month} className="flex-1 flex flex-col items-center gap-2 h-full justify-end">
+                        <div className="w-full flex items-end justify-center gap-1.5 h-full">
+                          <div className="w-3 bg-green-500/80 rounded-t-sm transition-all duration-500 hover:bg-green-400" style={{ height: `${approvedHeight}%` }}></div>
+                          <div className="w-3 bg-red-500/80 rounded-t-sm transition-all duration-500 hover:bg-red-400" style={{ height: `${rejectedHeight}%` }}></div>
+                        </div>
+                        <span className="text-[9px] font-mono font-bold text-slate-500 uppercase">{month}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex justify-between items-center pt-2">
+                  <span className="text-[9px] font-bold text-slate-500 uppercase">Centro de Inteligência GTM</span>
+                  <button onClick={() => setActiveTab('evaluation')} className="text-[10px] font-black text-amber-500 hover:underline uppercase tracking-wider flex items-center gap-1">
+                    Iniciar Nova Avaliação <ArrowRight size={12} />
+                  </button>
+                </div>
+              </div>
+
+              {/* CARD DE PONTOS CRÍTICOS & ATALHO */}
+              <div className="flex flex-col gap-4">
+                <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-5 flex-1 flex flex-col justify-between">
+                  <div>
+                    <h3 className="text-xs font-black text-amber-500 uppercase tracking-widest border-b border-white/5 pb-2 mb-3">Pontos Críticos</h3>
+                    <p className="text-[10px] text-slate-400 leading-relaxed mb-4">
+                      Análise técnica de maior índice de perda de notas entre os conscritos nas últimas provas:
+                    </p>
+                    <div className="space-y-3">
+                      <div>
+                        <div className="flex justify-between text-[9px] font-bold uppercase mb-1">
+                          <span className="text-slate-400">Circuito de Rampas</span>
+                          <span className="text-amber-500">45% erros</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-black rounded-full overflow-hidden">
+                          <div className="h-full bg-amber-500 w-[45%]"></div>
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex justify-between text-[9px] font-bold uppercase mb-1">
+                          <span className="text-slate-400">Tempo do Túnel</span>
+                          <span className="text-amber-500">30% erros</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-black rounded-full overflow-hidden">
+                          <div className="h-full bg-amber-500 w-[30%]"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button onClick={() => setActiveTab('evaluation')} className="w-full py-3 mt-4 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-lg shadow-amber-500/10 flex items-center justify-center gap-2">
+                    <Plus size={14} /> Abrir Nova Ficha
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* PRÉVIA DO HISTÓRICO (LATEST UPDATES) */}
+            <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-6">
+              <div className="flex justify-between items-center border-b border-white/5 pb-3 mb-4">
+                <h3 className="text-xs font-black text-amber-500 uppercase tracking-widest">Últimas Fichas Concluídas</h3>
+                <button onClick={() => setActiveTab('history')} className="text-[9px] font-bold text-slate-500 hover:text-amber-500 uppercase tracking-wider">
+                  Ver Histórico Completo →
+                </button>
+              </div>
+
+              {history.length === 0 ? (
+                <p className="text-center text-[10px] text-slate-600 uppercase py-6 font-bold">Nenhum registro arquivado recentemente.</p>
+              ) : (
+                <div className="space-y-2">
+                  {history.slice(0, 4).map(item => (
+                    <div key={item.id} className="bg-black/40 border border-white/5 rounded-xl p-3 flex items-center justify-between hover:border-amber-500/30 transition-all">
+                      <div className="flex items-center gap-4">
+                        <div className={`p-2 rounded-lg ${item.finalScore >= item.passingGrade ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                          {item.finalScore >= item.passingGrade ? <UserCheck size={16}/> : <UserX size={16}/>}
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-white uppercase">{item.state.candidate.name}</h4>
+                          <span className="text-[8px] text-slate-500 font-mono uppercase">ID: {item.state.candidate.id} • {item.date}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-6">
+                        <div className="text-right">
+                          <span className={`text-sm font-black tabular-nums ${item.finalScore >= item.passingGrade ? 'text-green-500' : 'text-red-500'}`}>{item.finalScore.toFixed(1)}</span>
+                          <span className="text-[7px] font-bold text-slate-600 block uppercase">Nota</span>
+                        </div>
+                        <button onClick={() => { setSelectedResult(item); setShowResultModal(true); }} className="p-2 text-slate-400 hover:text-amber-500 bg-white/5 rounded-lg">
+                          <Eye size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+          </div>
+        )}
+
+        {/* TAB AVALIAÇÃO */}
         {activeTab === 'evaluation' && (
           <div className="h-full max-w-full grid grid-cols-12 gap-4 animate-in fade-in duration-500 overflow-hidden">
+            
+            {/* INSTRUTORES E CONSCRITO */}
             <div className="col-span-12 lg:col-span-3 flex flex-col gap-3 overflow-y-auto custom-scrollbar pr-2">
-              <section className="bg-zinc-900/40 border border-white/5 rounded-[1.2rem] p-4 space-y-2.5">
+              <section className="bg-zinc-900/50 border border-amber-500/10 rounded-[1.2rem] p-4 space-y-2.5">
                 <div className="flex justify-between items-center">
                   <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><Users size={12}/> Instrutores</h3>
                   <button onClick={() => setState(p => ({...p, instructors: [...p.instructors, {id:'', name:''}]}))} className="p-1 bg-amber-500/10 text-amber-500 rounded-md hover:bg-amber-500/20"><Plus size={10}/></button>
@@ -344,21 +680,21 @@ const App: React.FC = () => {
                 ))}
               </section>
 
-              <section className="bg-zinc-900/40 border border-white/5 rounded-[1.2rem] p-4 space-y-2.5">
+              <section className="bg-zinc-900/50 border border-amber-500/10 rounded-[1.2rem] p-4 space-y-2.5">
                 <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><User size={12}/> Conscrito</h3>
                 <input placeholder="NOME DO CONSRITO" className="w-full bg-black/60 border border-white/5 rounded-lg p-2 text-[10px] uppercase font-bold outline-none focus:border-amber-500" value={state.candidate.name} onChange={e => setState({...state, candidate: {...state.candidate, name: e.target.value}})} />
                 <input placeholder="ID / PASSAPORTE" className="w-full bg-black/60 border border-white/5 rounded-lg p-2 text-[10px] font-bold outline-none focus:border-amber-500" value={state.candidate.id} onChange={e => setState({...state, candidate: {...state.candidate, id: e.target.value}})} />
               </section>
 
-              <section className="bg-zinc-900/40 border border-white/5 rounded-[1.2rem] p-5 flex flex-col gap-3 mt-auto">
+              <section className="bg-zinc-900/50 border border-amber-500/20 rounded-[1.2rem] p-5 flex flex-col gap-3 mt-auto">
                 <div className="flex justify-between items-start">
                   <div>
-                    <span className="text-[9px] font-black text-slate-700 uppercase block mb-1 tracking-widest">Nota Atual</span>
+                    <span className="text-[9px] font-black text-slate-500 uppercase block mb-1 tracking-widest">Nota Atual</span>
                     <div className="text-4xl font-sans font-black text-amber-500 tracking-tighter">{finalScore.toFixed(1)}</div>
                   </div>
                   <div className="text-right">
-                    <span className="text-[9px] font-black text-slate-700 uppercase block mb-1 tracking-widest">Média</span>
-                    <input type="number" step="0.5" className="w-12 bg-black border border-white/5 rounded-lg p-1 text-center text-amber-500 text-[10px] font-bold outline-none" value={passingGrade} onChange={e => setPassingGrade(parseFloat(e.target.value) || 0)} />
+                    <span className="text-[9px] font-black text-slate-500 uppercase block mb-1 tracking-widest">Média</span>
+                    <input type="number" step="0.5" className="w-12 bg-black border border-amber-500/20 rounded-lg p-1 text-center text-amber-500 text-[10px] font-bold outline-none" value={passingGrade} onChange={e => setPassingGrade(parseFloat(e.target.value) || 0)} />
                   </div>
                 </div>
                 <div className={`w-full py-2 rounded-lg border text-center font-black text-[9px] tracking-[0.2em] ${finalScore >= passingGrade ? 'bg-green-500/10 border-green-500/30 text-green-500' : 'bg-red-500/10 border-red-500/30 text-red-500'}`}>
@@ -371,6 +707,7 @@ const App: React.FC = () => {
               </section>
             </div>
 
+            {/* CIRCUITO DE RAMPAS */}
             <div className="col-span-12 lg:col-span-4 flex flex-col gap-4 overflow-hidden">
               <section className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-5 space-y-3 flex-1 overflow-y-auto custom-scrollbar">
                 <div className="flex justify-between items-center border-b border-white/5 pb-2">
@@ -379,7 +716,7 @@ const App: React.FC = () => {
                 </div>
                 <div className="space-y-1.5">
                   {state.ramps.map((ramp, idx) => (
-                    <div key={ramp.uid} className="flex gap-3 items-center bg-black/60 border border-white/5 rounded-xl p-2.5 group hover:border-amber-500/20 transition-all">
+                    <div key={ramp.uid} className="flex gap-3 items-center bg-black/60 border border-white/5 rounded-xl p-2.5 group hover:border-amber-500/30 transition-all">
                       <input placeholder="TESTE DE RAMPA" className="flex-1 bg-transparent text-[8px] font-black uppercase outline-none text-slate-300" value={ramp.name} onChange={e => {
                         const n = [...state.ramps]; n[idx].name = e.target.value; setState({...state, ramps: n});
                       }} />
@@ -389,7 +726,7 @@ const App: React.FC = () => {
                           const n = [...state.ramps]; n[idx].score = parseFloat(e.target.value) || 0; setState({...state, ramps: n});
                         }} />
                       </div>
-                      <button onClick={() => setState(p => ({...p, ramps: p.ramps.filter(r=>r.uid!==ramp.uid)}))} className="text-slate-900 group-hover:text-red-500 transition-colors"><Trash2 size={10}/></button>
+                      <button onClick={() => setState(p => ({...p, ramps: p.ramps.filter(r=>r.uid!==ramp.uid)}))} className="text-slate-700 group-hover:text-red-500 transition-colors"><Trash2 size={10}/></button>
                     </div>
                   ))}
                 </div>
@@ -403,7 +740,7 @@ const App: React.FC = () => {
                     { label: 'RAMPAS', score: categoryScores.ramps, icon: <MapPin size={10}/> },
                   ].map(item => (
                     <div key={item.label} className="flex justify-between items-center bg-black/40 px-3 py-2 rounded-xl border border-white/5">
-                      <span className="text-[8px] font-black text-slate-600 uppercase tracking-tighter flex items-center gap-2">{item.icon} {item.label}</span>
+                      <span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter flex items-center gap-2">{item.icon} {item.label}</span>
                       <span className="text-sm font-black text-amber-500 tabular-nums">{item.score.toFixed(1)}</span>
                     </div>
                   ))}
@@ -411,31 +748,54 @@ const App: React.FC = () => {
               </section>
             </div>
 
+            {/* TÚNEL, CHINA E ACOMPANHAMENTOS COM CRONÔMETRO INTERATIVO */}
             <div className="col-span-12 lg:col-span-5 flex flex-col gap-4 overflow-hidden">
               <div className="grid grid-cols-2 gap-3 flex-shrink-0">
                 <div className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-4 space-y-2.5">
                   <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><Zap size={14}/> TUNEL</h3>
-                  <div className="flex items-center gap-2 bg-black/60 border border-white/5 rounded-lg px-2.5 py-1.5 group/time">
-                    <Clock className="text-amber-500/50 group-focus-within/time:text-amber-500 transition-colors shrink-0" size={14} />
-                    <input placeholder="00:00" className="w-full bg-transparent text-[11px] font-black uppercase outline-none text-amber-500" value={state.tunnel.time} onChange={e => setState({...state, tunnel: {...state.tunnel, time: e.target.value}})} />
+                  
+                  <div className="flex items-center justify-between gap-2 bg-black/60 border border-white/5 rounded-lg px-2.5 py-1.5">
+                    <InteractiveTimer 
+                      value={state.tunnel.time} 
+                      onStop={(formatted) => setState(p => ({...p, tunnel: {...p.tunnel, time: formatted}}))}
+                    />
+                    <input 
+                      placeholder="00:00" 
+                      className="w-full bg-transparent text-[11px] font-black uppercase outline-none text-amber-500 text-right font-mono" 
+                      value={state.tunnel.time} 
+                      onChange={e => setState({...state, tunnel: {...state.tunnel, time: e.target.value}})} 
+                    />
                   </div>
+
                   <div className="bg-zinc-950 border border-amber-500/40 rounded-lg p-1.5 flex items-center justify-between px-2.5">
                     <span className="text-[8px] font-black text-amber-600 uppercase tracking-tighter">NOTA:</span>
                     <input type="number" step="0.5" className="flex-1 bg-transparent text-sm font-black outline-none text-amber-400 text-center" value={state.tunnel.score || ''} onChange={e => setState({...state, tunnel: {...state.tunnel, score: parseFloat(e.target.value) || 0}})} />
                   </div>
                 </div>
+
                 <div className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-4 space-y-2.5">
                   <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><Activity size={14}/> MOD. CHINA</h3>
-                  <div className="flex items-center gap-2 bg-black/60 border border-white/5 rounded-lg px-2.5 py-1.5 group/time">
-                    <Clock className="text-amber-500/50 group-focus-within/time:text-amber-500 transition-colors shrink-0" size={14} />
-                    <input placeholder="00:00" className="w-full bg-transparent text-[11px] font-black uppercase outline-none text-amber-500" value={state.modulation.time} onChange={e => setState({...state, modulation: {...state.modulation, time: e.target.value}})} />
+                  
+                  <div className="flex items-center justify-between gap-2 bg-black/60 border border-white/5 rounded-lg px-2.5 py-1.5">
+                    <InteractiveTimer 
+                      value={state.modulation.time} 
+                      onStop={(formatted) => setState(p => ({...p, modulation: {...p.modulation, time: formatted}}))}
+                    />
+                    <input 
+                      placeholder="00:00" 
+                      className="w-full bg-transparent text-[11px] font-black uppercase outline-none text-amber-500 text-right font-mono" 
+                      value={state.modulation.time} 
+                      onChange={e => setState({...state, modulation: {...state.modulation, time: e.target.value}})} 
+                    />
                   </div>
+
                   <div className="bg-zinc-950 border border-amber-500/40 rounded-lg p-1.5 flex items-center justify-between px-2.5">
                     <span className="text-[8px] font-black text-amber-600 uppercase tracking-tighter">NOTA:</span>
                     <input type="number" step="0.5" className="flex-1 bg-transparent text-sm font-black outline-none text-amber-400 text-center" value={state.modulation.score || ''} onChange={e => setState({...state, modulation: {...state.modulation, score: parseFloat(e.target.value) || 0}})} />
                   </div>
                 </div>
               </div>
+
               <section className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-5 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
                 <div className="flex justify-between items-center border-b border-white/5 pb-2">
                   <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><ClipboardCheck size={14}/> ACOMPANHAMENTOS</h3>
@@ -443,14 +803,21 @@ const App: React.FC = () => {
                 </div>
                 <div className="space-y-2.5">
                   {state.tracking.map((track, idx) => (
-                    <div key={track.uid} className="bg-black/60 border border-white/5 rounded-xl p-3 flex items-center justify-between group transition-all hover:border-amber-500/20">
+                    <div key={track.uid} className="bg-black/60 border border-white/5 rounded-xl p-3 flex items-center justify-between group transition-all hover:border-amber-500/30">
                       <div className="flex-1 space-y-1.5">
                         <input placeholder="SETOR / ROTA" className="w-full bg-transparent text-[10px] font-black uppercase outline-none text-slate-400" value={track.location} onChange={e => {
                           const n = [...state.tracking]; n[idx].location = e.target.value; setState({...state, tracking: n});
                         }} />
-                        <div className="flex items-center gap-2 group/time">
-                          <Clock className="text-amber-500/40 group-focus-within/time:text-amber-500 transition-colors" size={14} />
-                          <input placeholder="00:00" className="bg-transparent outline-none text-[11px] text-amber-500 font-mono w-full" value={track.time} onChange={e => {
+                        <div className="flex items-center justify-between gap-2">
+                          <InteractiveTimer 
+                            value={track.time} 
+                            onStop={(formatted) => {
+                              const n = [...state.tracking];
+                              n[idx].time = formatted;
+                              setState({...state, tracking: n});
+                            }}
+                          />
+                          <input placeholder="00:00" className="bg-transparent outline-none text-[11px] text-amber-500 font-mono w-full text-right" value={track.time} onChange={e => {
                             const n = [...state.tracking]; n[idx].time = e.target.value; setState({...state, tracking: n});
                           }} />
                         </div>
@@ -462,7 +829,7 @@ const App: React.FC = () => {
                             const n = [...state.tracking]; n[idx].score = parseFloat(e.target.value) || 0; setState({...state, tracking: n});
                           }} />
                         </div>
-                        <button onClick={() => setState(p => ({...p, tracking: p.tracking.filter(t=>t.uid!==track.uid)}))} className="text-slate-900 group-hover:text-red-500 transition-colors"><Trash2 size={12}/></button>
+                        <button onClick={() => setState(p => ({...p, tracking: p.tracking.filter(t=>t.uid!==track.uid)}))} className="text-slate-700 group-hover:text-red-500 transition-colors"><Trash2 size={12}/></button>
                       </div>
                     </div>
                   ))}
@@ -472,12 +839,13 @@ const App: React.FC = () => {
           </div>
         )}
 
+        {/* TAB PERGUNTAS / PROTOCOLOS */}
         {activeTab === 'protocols' && (
           <div className="max-w-4xl mx-auto h-full flex flex-col gap-4 animate-in fade-in slide-in-from-top-4 duration-500 overflow-hidden">
             <div className="bg-zinc-900/40 border border-white/5 rounded-[2rem] p-8 backdrop-blur-md overflow-hidden flex flex-col h-full shadow-2xl">
               <div className="flex items-center gap-4 mb-6 border-b border-white/5 pb-4">
                 <div className="p-2.5 bg-amber-500/10 rounded-xl border border-amber-500/20"><HelpCircle className="text-amber-500" size={20}/></div>
-                <h2 className="text-2xl font-military font-bold text-white tracking-widest uppercase">Perguntas de Recrutamento</h2>
+                <h2 className="text-2xl font-military font-bold text-white tracking-widest uppercase">Perguntas de Recrutamento GTM</h2>
               </div>
               <div className="flex-1 overflow-y-auto custom-scrollbar pr-3 space-y-3">
                 {protocols.map((p, idx) => (
@@ -499,13 +867,14 @@ const App: React.FC = () => {
           </div>
         )}
 
+        {/* TAB HISTÓRICO */}
         {activeTab === 'history' && (
           <div className="max-w-5xl mx-auto h-full flex flex-col animate-in fade-in duration-500 overflow-hidden">
             <div className="flex items-center justify-between mb-6 border-b border-white/5 pb-4">
               <div className="flex items-center gap-4">
                 <div className="p-2.5 bg-amber-500/10 rounded-xl border border-amber-500/20"><History className="text-amber-500" size={20}/></div>
                 <div>
-                  <h2 className="text-xl font-military font-bold text-white tracking-widest uppercase">Histórico Operacional</h2>
+                  <h2 className="text-xl font-military font-bold text-white tracking-widest uppercase">Histórico Operacional GTM</h2>
                   <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest mt-1">{history.length} Registros Arquivados</p>
                 </div>
               </div>
@@ -536,17 +905,17 @@ const App: React.FC = () => {
                             <span className="text-white">{item.state.instructors[0]?.name || 'N/A'}</span>
                           </span>
                           <span className="opacity-20">|</span>
-                          <span className="text-slate-700 font-mono">{item.date}</span>
+                          <span className="text-slate-600 font-mono">{item.date}</span>
                         </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-6">
                       <div className="text-right pr-6 border-r border-white/5">
                         <span className={`text-xl font-black tabular-nums ${item.finalScore >= item.passingGrade ? 'text-green-500' : 'text-red-500'}`}>{item.finalScore.toFixed(1)}</span>
-                        <div className="text-[7px] font-bold text-slate-700 uppercase tracking-widest">Score</div>
+                        <div className="text-[7px] font-bold text-slate-600 uppercase tracking-widest">Score</div>
                       </div>
                       <div className="flex items-center gap-3">
-                        <button type="button" className="p-2.5 text-slate-600 hover:text-amber-500 transition-colors bg-white/5 rounded-lg border border-white/5" title="Visualizar">
+                        <button type="button" className="p-2.5 text-slate-400 hover:text-amber-500 transition-colors bg-white/5 rounded-lg border border-white/5" title="Visualizar">
                           <Eye size={18}/>
                         </button>
                         <button type="button" onClick={(e) => deleteHistoryEntry(item.id, e)} className="p-2.5 text-slate-400 hover:text-red-500 transition-all bg-white/5 rounded-lg border border-white/5 hover:bg-red-500/10 hover:border-red-500/20 relative z-50" title="Apagar Registro">
@@ -563,14 +932,15 @@ const App: React.FC = () => {
 
       </main>
 
-      <footer className="px-8 py-1.5 border-t border-white/5 bg-black text-[6px] font-black text-slate-800 uppercase tracking-[0.4em] text-center flex-shrink-0">
-        ROCAM - GRUPAMENTO TÁTICO DE ELITE - CIDADE SOUL
+      {/* RODAPÉ */}
+      <footer className="px-8 py-1.5 border-t border-white/5 bg-black text-[6px] font-black text-slate-600 uppercase tracking-[0.4em] text-center flex-shrink-0">
+        GTM - GRUPAMENTO TÁTICO DE MOTOCICLETAS
       </footer>
 
       <style>{`
         .custom-scrollbar::-webkit-scrollbar { width: 3px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #1a1a1a; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #27272a; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #f59e0b; }
         @keyframes fadeIn { from { opacity: 0; transform: scale(0.99); } to { opacity: 1; transform: scale(1); } }
         .animate-in { animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
