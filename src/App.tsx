@@ -161,7 +161,6 @@ const App: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
 
-  // FUNÇÃO AUXILIAR PARA CONVERTER "MM:SS" EM SEGUNDOS
   const parseTimeToSeconds = (timeStr: string): number => {
     if (!timeStr) return 0;
     const parts = timeStr.split(':');
@@ -179,12 +178,19 @@ const App: React.FC = () => {
       const data = snapshot.val();
       if (data) {
         setActiveEvaluationsList(data);
+        // Se estivermos na aba de avaliação mas a sala atual foi apagada e não há mais nenhuma, joga para o dashboard
+        if (Object.keys(data).length === 0 && activeTab === 'evaluation') {
+          setActiveTab('dashboard');
+        }
       } else {
         setActiveEvaluationsList({});
+        if (activeTab === 'evaluation') {
+          setActiveTab('dashboard');
+        }
       }
     });
     return () => unsubList();
-  }, []);
+  }, [activeTab]);
 
   useEffect(() => {
     const historyRef = ref(database, 'global_history');
@@ -253,7 +259,6 @@ const App: React.FC = () => {
     }
   };
 
-  // CÁLCULO AUTOMÁTICO DO TÚNEL (Máx 0.5pts, referência 1:40 / 100s)
   const handleTunnelTimeChange = (timeStr: string) => {
     const secs = parseTimeToSeconds(timeStr);
     let calculatedScore = 0.5;
@@ -268,7 +273,6 @@ const App: React.FC = () => {
     });
   };
 
-  // CÁLCULO AUTOMÁTICO DOS ACOMPANHAMENTOS (Máx 1.0pt, referência 1:30 / 90s)
   const handleTrackingTimeChange = (idx: number, timeStr: string) => {
     const secs = parseTimeToSeconds(timeStr);
     let calculatedScore = Math.min(1.0, Math.max(0, 1.0 * (secs / 90)));
@@ -416,31 +420,22 @@ const App: React.FC = () => {
     setShowSuccessToast(true);
     
     const cleanId = sessionId.trim().toUpperCase();
-    remove(ref(database, `sessions/${cleanId}`)).catch(err => console.error(err));
-    remove(ref(database, `active_sessions/${cleanId}`)).catch(err => console.error(err));
+    await remove(ref(database, `sessions/${cleanId}`)).catch(err => console.error(err));
+    await remove(ref(database, `active_sessions/${cleanId}`)).catch(err => console.error(err));
 
-    const resetState = {
-      instructors: state.instructors.map(i => ({...i})), 
-      candidate: { id: '', name: '' },
-      ramps: defaultRamps.map(r => ({ ...r, score: 0 })),
-      tunnel: { time: '', score: 0 },
-      modulation: { time: '', score: 0 },
-      tracking: defaultTracking.map(t => ({ ...t, score: 0, time: '' })),
-    };
-
-    setState(resetState);
-    setSessionId('GTM-' + Math.floor(10 + Math.random() * 90));
     setTimeout(() => setShowSuccessToast(false), 3000);
+    setActiveTab('dashboard');
   };
 
-  const handleDeleteActiveSession = (idToDelete: string, e: React.MouseEvent) => {
+  const handleDeleteActiveSession = async (idToDelete: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (window.confirm(`Deseja realmente apagar a ficha da sala ${idToDelete}?`)) {
-      remove(ref(database, `sessions/${idToDelete}`)).catch(err => console.error(err));
-      remove(ref(database, `active_sessions/${idToDelete}`)).catch(err => console.error(err));
+      await remove(ref(database, `sessions/${idToDelete}`)).catch(err => console.error(err));
+      await remove(ref(database, `active_sessions/${idToDelete}`)).catch(err => console.error(err));
       
+      // Se a ficha apagada for a que estava aberta, limpa e joga para o dashboard
       if (sessionId.toUpperCase() === idToDelete.toUpperCase()) {
-        handleCreateNewBlankSheet();
+        setActiveTab('dashboard');
       }
     }
   };
@@ -547,6 +542,7 @@ const App: React.FC = () => {
                         onClick={() => {
                           setSessionId(id);
                           setShowEvaluationsModal(false);
+                          setActiveTab('evaluation');
                         }}
                         className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase text-[9px] tracking-wider rounded-lg transition-all shadow-md"
                       >
@@ -965,7 +961,6 @@ const App: React.FC = () => {
                 </section>
               </div>
 
-              {/* RAMPAS COM BOTÕES DE ACERTO (0,6) E ERRO (0,0) */}
               <div className="col-span-12 lg:col-span-4 flex flex-col gap-4 overflow-hidden">
                 <section className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-5 space-y-3 flex-1 overflow-y-auto custom-scrollbar">
                   <div className="flex justify-between items-center border-b border-white/5 pb-2">
@@ -987,10 +982,10 @@ const App: React.FC = () => {
                               n[idx].score = 0.6; 
                               updateStateAndSync({...state, ramps: n});
                             }}
-                            className={`px-2 py-1 rounded text-[8px] font-black uppercase transition-all ${ramp.score === 0.6 ? 'bg-green-500 text-black shadow-md' : 'bg-green-500/20 text-green-500 hover:bg-green-500/30'}`}
+                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${ramp.score === 0.6 ? 'bg-green-500 text-black shadow-lg scale-105' : 'bg-green-500/20 text-green-500 hover:bg-green-500/30'}`}
                             title="Acertou (+0,6)"
                           >
-                            ✓ 0,6
+                            ✓
                           </button>
                           <button 
                             type="button"
@@ -999,10 +994,10 @@ const App: React.FC = () => {
                               n[idx].score = 0.0; 
                               updateStateAndSync({...state, ramps: n});
                             }}
-                            className={`px-2 py-1 rounded text-[8px] font-black uppercase transition-all ${ramp.score === 0.0 ? 'bg-red-500 text-white shadow-md' : 'bg-red-500/20 text-red-500 hover:bg-red-500/30'}`}
+                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${ramp.score === 0.0 ? 'bg-red-500 text-white shadow-lg scale-105' : 'bg-red-500/20 text-red-500 hover:bg-red-500/30'}`}
                             title="Errou (0,0)"
                           >
-                            ✕ 0,0
+                            ✕
                           </button>
                         </div>
 
@@ -1031,8 +1026,6 @@ const App: React.FC = () => {
 
               <div className="col-span-12 lg:col-span-5 flex flex-col gap-4 overflow-hidden">
                 <div className="grid grid-cols-2 gap-3 flex-shrink-0">
-                  
-                  {/* TÚNEL COM CÁLCULO AUTOMÁTICO DE TEMPO (Máx 0.5, ref 1:40) */}
                   <div className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-4 space-y-2.5">
                     <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><Zap size={14}/> TUNEL (Máx 0.5)</h3>
                     
@@ -1055,7 +1048,6 @@ const App: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* MODULAÇÃO CHINA MANUAL */}
                   <div className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-4 space-y-2.5">
                     <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><Activity size={14}/> MOD. CHINA (Manual)</h3>
                     
@@ -1079,7 +1071,6 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                {/* ACOMPANHAMENTOS (PRAIA, GROOVE, MANSÕES) COM CÁLCULO AUTOMÁTICO (Máx 1.0, ref 1:30) */}
                 <section className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-5 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
                   <div className="flex justify-between items-center border-b border-white/5 pb-2">
                     <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><ClipboardCheck size={14}/> ACOMPANHAMENTOS (Máx 1.0)</h3>
