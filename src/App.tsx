@@ -133,15 +133,8 @@ const App: React.FC = () => {
   const [activeEvaluationsList, setActiveEvaluationsList] = useState<{ [id: string]: { candidateName: string; updatedAt: string } }>({});
   const [showEvaluationsModal, setShowEvaluationsModal] = useState(false);
 
-  const [history, setHistory] = useState<SavedEvaluation[]>(() => {
-    try {
-      const saved = localStorage.getItem('gtm_history_v1');
-      return saved ? JSON.parse(saved) : [];
-    } catch (e) {
-      console.error("Erro ao carregar histórico GTM:", e);
-      return [];
-    }
-  });
+  // HISTÓRICO SINCRONIZADO GLOBALMENTE NO FIREBASE (Substitui o localStorage isolado)
+  const [history, setHistory] = useState<SavedEvaluation[]>([]);
 
   const defaultRamps = [
     { uid: '1', name: 'RODOVIA PARA O VERMELHO', score: 0 },
@@ -169,6 +162,7 @@ const App: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
 
+  // ESCUTA A LISTA DE FICHAS ABERTAS NO FIREBASE EM TEMPO REAL
   useEffect(() => {
     const listRef = ref(database, 'active_sessions');
     const unsubList = onValue(listRef, (snapshot) => {
@@ -182,6 +176,23 @@ const App: React.FC = () => {
     return () => unsubList();
   }, []);
 
+  // ESCUTA O HISTÓRICO GLOBAL NO FIREBASE (Para todos os PCs verem as fichas finalizadas)
+  useEffect(() => {
+    const historyRef = ref(database, 'global_history');
+    const unsubHistory = onValue(historyRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        // Converte o objeto do Firebase num array ordenado
+        const historyArray = Object.values(data) as SavedEvaluation[];
+        setHistory(historyArray.reverse());
+      } else {
+        setHistory([]);
+      }
+    });
+    return () => unsubHistory();
+  }, []);
+
+  // ESCUTA A SALA ATUAL SELECIONADA
   useEffect(() => {
     if (!sessionId.trim()) return;
     const sessionRef = ref(database, `sessions/${sessionId.trim().toUpperCase()}`);
@@ -234,10 +245,6 @@ const App: React.FC = () => {
       }).catch(err => console.error("Erro ao atualizar índice:", err));
     }
   };
-
-  useEffect(() => {
-    localStorage.setItem('gtm_history_v1', JSON.stringify(history));
-  }, [history]);
 
   const protocols = [
     { level: 'FÁCIL', q: 'Qual a prioridade principal do GTM em acompanhamentos?', a: 'O GTM tem prioridade em acompanhamentos a motocicletas.' },
@@ -331,17 +338,19 @@ const App: React.FC = () => {
     setShowSettings(false);
   };
 
+  // BOTÃO SALVAR FICHA: Envia os dados atuais para a nuvem globalmente
   const handleSaveOnly = () => {
     setIsSaving(true);
     updateStateAndSync(state);
     setTimeout(() => {
       setIsSaving(false);
-      setToastMessage('Ficha salva com sucesso!');
+      setToastMessage('Ficha salva e sincronizada na nuvem!');
       setShowSuccessToast(true);
       setTimeout(() => setShowSuccessToast(false), 3000);
     }, 500);
   };
 
+  // BOTÃO FINALIZAR: Guarda permanentemente no histórico global do Firebase
   const handleFinish = async () => {
     if (!state.candidate.name || !state.candidate.id) {
       alert("ERRO: Nome e ID do conscrito são obrigatórios para finalizar.");
@@ -357,8 +366,9 @@ const App: React.FC = () => {
       verdict: isApprovedNow ? 'APROVADO' : 'REPROVADO'
     };
 
+    const entryId = Math.random().toString(36).substring(2, 11);
     const newEntry: SavedEvaluation = {
-      id: Math.random().toString(36).substring(2, 11),
+      id: entryId,
       date: new Date().toLocaleString('pt-BR'),
       state: JSON.parse(JSON.stringify(state)),
       finalScore,
@@ -366,9 +376,12 @@ const App: React.FC = () => {
       passingGrade
     };
 
-    setHistory(prev => [newEntry, ...prev]);
+    // Salva no histórico global do Firebase
+    const historyEntryRef = ref(database, `global_history/${entryId}`);
+    await set(historyEntryRef, newEntry).catch(err => console.error("Erro ao salvar histórico global:", err));
+
     setIsFinishing(false);
-    setToastMessage('Avaliação Finalizada e Salva no Histórico!');
+    setToastMessage('Avaliação Finalizada e Salva no Histórico Global!');
     setShowSuccessToast(true);
     
     const cleanId = sessionId.trim().toUpperCase();
@@ -389,14 +402,12 @@ const App: React.FC = () => {
     setTimeout(() => setShowSuccessToast(false), 3000);
   };
 
-  // FUNÇÃO PARA APAGAR FICHA ABERTA DA EQUIPE PELO MODAL
   const handleDeleteActiveSession = (idToDelete: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (window.confirm(`Deseja realmente apagar a ficha da sala ${idToDelete}?`)) {
       remove(ref(database, `sessions/${idToDelete}`)).catch(err => console.error(err));
       remove(ref(database, `active_sessions/${idToDelete}`)).catch(err => console.error(err));
       
-      // Se apagarmos a ficha que está atualmente aberta no ecrã, geramos uma nova em branco
       if (sessionId.toUpperCase() === idToDelete.toUpperCase()) {
         handleCreateNewBlankSheet();
       }
@@ -405,8 +416,8 @@ const App: React.FC = () => {
 
   const deleteHistoryEntry = (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm("CONFIRMAÇÃO OPERACIONAL: Deseja apagar este registro permanentemente do histórico?")) {
-      setHistory(prev => prev.filter(item => item.id !== id));
+    if (window.confirm("CONFIRMAÇÃO OPERACIONAL: Deseja apagar este registro permanentemente do histórico global?")) {
+      remove(ref(database, `global_history/${id}`)).catch(err => console.error("Erro ao apagar do histórico:", err));
     }
   };
 
@@ -478,7 +489,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* MODAL DE GESTÃO DE FICHAS EM ABERTO COM BOTÃO LIXINHO */}
       {showEvaluationsModal && (
         <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
           <div className="bg-zinc-950 border border-amber-500/30 p-6 rounded-[2rem] w-full max-w-lg space-y-6 shadow-2xl">
@@ -646,7 +656,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* CABEÇALHO COM BOTÃO DE NOVA FICHA DESTACADO */}
       <header className="px-8 py-3 flex items-center justify-between bg-zinc-950 border-b border-amber-500/20 flex-shrink-0 z-50">
         <div className="flex items-center gap-4">
           <img src={gtmLogo} alt="GTM Logo" className="w-10 h-10 object-contain drop-shadow-[0_0_10px_rgba(245,158,11,0.3)]" />
