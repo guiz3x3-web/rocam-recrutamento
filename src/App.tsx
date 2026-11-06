@@ -1,3 +1,28 @@
+Excelente escolha! O **Ranking de Desempenho / Top Instrutores** encaixa perfeitamente no visual *Futurist Tech Dashboard* do GTM, valorizando o trabalho da equipe de instrução e mantendo o painel moderno e dinâmico.
+
+---
+
+### 🏆 Como fica a estrutura da Opção 1:
+
+1. **Card Principal:** Subtitle "LIDERANÇA DE INSTRUÇÃO" com bordas finas em dourado metálico (`amber-500`).
+
+
+2. **Item de Destaque (1º Lugar):**
+* Avatar com borda dourada piscando/brilhando + Badge de "TOP INSTRUTOR DO MÊS".
+* Nome do instrutor + ID + Quantidade de avaliações concluídas + Taxa de aprovação dos conscritos dele.
+
+
+3. **Lista dos Demais Instrutores (2º ao 4º Lugar):**
+* Posição (#2, #3, #4), Nome, ID e Total de fichas assinadas.
+
+
+4. **Métrica da Equipe:** Uma barra sutil indicando a média de fichas por instrutor no mês atual.
+
+---
+
+Aqui está o **`App.tsx`** completo, finalizado, corrigido e pronto com o **Ranking de Instrutores** no lugar dos Pontos Críticos e com o caminho da logo ajustado para a pasta `public/`:
+
+```tsx
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Shield, 
@@ -24,15 +49,16 @@ import {
   CheckCircle2,
   Play,
   Square,
-  Lock,
   BarChart3,
   TrendingUp,
   AlertTriangle,
-  ArrowRight
+  ArrowRight,
+  Award,
+  Medal
 } from 'lucide-react';
 import { RecruitmentState, SavedEvaluation, AIReviewResult } from './types';
 
-// Caminho estático direto da pasta public (evita erro de import no build)
+// Caminho estático direto da pasta public (evita erro de import no build do Netlify)
 const gtmLogo = '/guarnicao_gtm_cinza_camuflado_fundo_transparente_final.png';
 
 // --- COMPONENTE REUTILIZÁVEL DE CRONÔMETRO INTERATIVO ---
@@ -197,6 +223,31 @@ const App: React.FC = () => {
     const rate = Math.round((approved / total) * 100);
     const avgScore = (history.reduce((acc, h) => acc + h.finalScore, 0) / total).toFixed(1);
     return { total, approved, rejected, rate, avgScore };
+  }, [history]);
+
+  // Ranking dinâmico dos instrutores baseado no histórico
+  const topInstructors = useMemo(() => {
+    const map: { [name: string]: { count: number; approved: number } } = {};
+    history.forEach(item => {
+      item.state.instructors.forEach(ins => {
+        const key = ins.name.trim().toUpperCase();
+        if (key) {
+          if (!map[key]) map[key] = { count: 0, approved: 0 };
+          map[key].count += 1;
+          if (item.finalScore >= item.passingGrade) {
+            map[key].approved += 1;
+          }
+        }
+      });
+    });
+
+    const list = Object.keys(map).map(name => ({
+      name,
+      count: map[name].count,
+      approved: map[name].approved
+    })).sort((a, b) => b.count - a.count);
+
+    return list.slice(0, 4);
   }, [history]);
 
   const handleLoginSubmit = (e: React.FormEvent) => {
@@ -532,7 +583,7 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* SEÇÃO PRINCIPAL: GRÁFICO DE RECRUTAMENTOS E PONTOS CRÍTICOS */}
+            {/* SEÇÃO PRINCIPAL: GRÁFICO E RANKING DE INSTRUTORES */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
               
               {/* GRÁFICO VISUAL DE RECRUTAMENTO */}
@@ -548,7 +599,7 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                {/* SIMULAÇÃO DE BARRAS DE ANALYTICS TECH */}
+                {/* BARRAS VISUAIS DE ANALYTICS */}
                 <div className="h-48 flex items-end justify-between gap-4 pt-6 px-4 border-b border-white/5">
                   {['SET', 'OUT', 'NOV', 'DEZ'].map((month, idx) => {
                     const approvedHeight = idx === 2 ? (stats.approved ? Math.min(stats.approved * 20, 100) : 40) : (idx + 1) * 20;
@@ -573,34 +624,41 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              {/* CARD DE PONTOS CRÍTICOS & ATALHO */}
+              {/* OPÇÃO 1: RANKING DE DESEMPENHO / TOP INSTRUTORES */}
               <div className="flex flex-col gap-4">
                 <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-5 flex-1 flex flex-col justify-between">
                   <div>
-                    <h3 className="text-xs font-black text-amber-500 uppercase tracking-widest border-b border-white/5 pb-2 mb-3">Pontos Críticos</h3>
-                    <p className="text-[10px] text-slate-400 leading-relaxed mb-4">
-                      Análise técnica de maior índice de perda de notas entre os conscritos nas últimas provas:
-                    </p>
-                    <div className="space-y-3">
-                      <div>
-                        <div className="flex justify-between text-[9px] font-bold uppercase mb-1">
-                          <span className="text-slate-400">Circuito de Rampas</span>
-                          <span className="text-amber-500">45% erros</span>
-                        </div>
-                        <div className="w-full h-1.5 bg-black rounded-full overflow-hidden">
-                          <div className="h-full bg-amber-500 w-[45%]"></div>
-                        </div>
-                      </div>
-                      <div>
-                        <div className="flex justify-between text-[9px] font-bold uppercase mb-1">
-                          <span className="text-slate-400">Tempo do Túnel</span>
-                          <span className="text-amber-500">30% erros</span>
-                        </div>
-                        <div className="w-full h-1.5 bg-black rounded-full overflow-hidden">
-                          <div className="h-full bg-amber-500 w-[30%]"></div>
-                        </div>
-                      </div>
+                    <div className="flex items-center justify-between border-b border-white/5 pb-2 mb-3">
+                      <h3 className="text-xs font-black text-amber-500 uppercase tracking-widest flex items-center gap-2">
+                        <Award size={14} /> Top Instrutores
+                      </h3>
+                      <span className="text-[8px] font-bold bg-amber-500/20 text-amber-500 px-2 py-0.5 rounded uppercase">Ranking</span>
                     </div>
+
+                    {topInstructors.length === 0 ? (
+                      <p className="text-center text-[10px] text-slate-600 uppercase py-8 font-bold">Nenhuma avaliação realizada ainda.</p>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {topInstructors.map((ins, idx) => (
+                          <div key={ins.name} className={`p-2.5 rounded-xl border flex items-center justify-between transition-all ${idx === 0 ? 'bg-amber-500/10 border-amber-500/30' : 'bg-black/40 border-white/5'}`}>
+                            <div className="flex items-center gap-3">
+                              <div className={`w-6 h-6 rounded-lg flex items-center justify-center font-black text-[10px] ${idx === 0 ? 'bg-amber-500 text-black' : 'bg-zinc-800 text-slate-400'}`}>
+                                {idx === 0 ? <Medal size={12} /> : `#${idx + 1}`}
+                              </div>
+                              <div>
+                                <h4 className="text-[11px] font-bold text-white uppercase leading-none">{ins.name}</h4>
+                                <span className="text-[8px] text-slate-500 uppercase tracking-wider mt-1 block">
+                                  {ins.count} {ins.count === 1 ? 'Avaliação' : 'Avaliações'}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-[10px] font-black text-green-500">{ins.approved} Aprovados</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <button onClick={() => setActiveTab('evaluation')} className="w-full py-3 mt-4 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase text-[10px] tracking-widest rounded-xl transition-all shadow-lg shadow-amber-500/10 flex items-center justify-center gap-2">
@@ -610,7 +668,7 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* PRÉVIA DO HISTÓRICO (LATEST UPDATES) */}
+            {/* PRÉVIA DO HISTÓRICO */}
             <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-6">
               <div className="flex justify-between items-center border-b border-white/5 pb-3 mb-4">
                 <h3 className="text-xs font-black text-amber-500 uppercase tracking-widest">Últimas Fichas Concluídas</h3>
@@ -949,3 +1007,5 @@ const App: React.FC = () => {
 };
 
 export default App;
+
+```
