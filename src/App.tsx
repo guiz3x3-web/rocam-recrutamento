@@ -32,7 +32,8 @@ import {
   Medal,
   Wifi,
   FolderOpen,
-  Save
+  Save,
+  RotateCcw
 } from 'lucide-react';
 import { RecruitmentState, SavedEvaluation, AIReviewResult } from './types';
 import { initializeApp } from "firebase/app";
@@ -56,9 +57,10 @@ const gtmLogo = '/guarnicao_gtm_cinza_camuflado_fundo_transparente_final.png';
 interface TimerButtonProps {
   value: string;
   onStop: (formattedTime: string) => void;
+  onReset: () => void;
 }
 
-const InteractiveTimer: React.FC<TimerButtonProps> = ({ value, onStop }) => {
+const InteractiveTimer: React.FC<TimerButtonProps> = ({ value, onStop, onReset }) => {
   const [isRunning, setIsRunning] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -89,6 +91,13 @@ const InteractiveTimer: React.FC<TimerButtonProps> = ({ value, onStop }) => {
     }
   };
 
+  const handleResetClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsRunning(false);
+    setSeconds(0);
+    onReset();
+  };
+
   const formatDisplay = (secCount: number) => {
     const mins = Math.floor(secCount / 60).toString().padStart(2, '0');
     const secs = (secCount % 60).toString().padStart(2, '0');
@@ -96,19 +105,30 @@ const InteractiveTimer: React.FC<TimerButtonProps> = ({ value, onStop }) => {
   };
 
   return (
-    <button
-      type="button"
-      onClick={toggleTimer}
-      title={isRunning ? "Clique para parar e salvar" : "Clique para iniciar o cronômetro"}
-      className={`px-2 py-1 rounded-md text-[10px] font-mono font-black uppercase flex items-center gap-1.5 transition-all shadow-md ${
-        isRunning 
-          ? 'bg-red-500 text-white animate-pulse border border-red-400' 
-          : 'bg-amber-500/20 text-amber-500 hover:bg-amber-500 hover:text-black border border-amber-500/30'
-      }`}
-    >
-      {isRunning ? <Square size={10} className="fill-current" /> : <Play size={10} className="fill-current" />}
-      <span>{isRunning ? formatDisplay(seconds) : (value || '00:00')}</span>
-    </button>
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        onClick={toggleTimer}
+        title={isRunning ? "Clique para parar e salvar" : "Clique para iniciar o cronômetro"}
+        className={`px-2 py-1 rounded-md text-[10px] font-mono font-black uppercase flex items-center gap-1.5 transition-all shadow-md ${
+          isRunning 
+            ? 'bg-red-500 text-white animate-pulse border border-red-400' 
+            : 'bg-amber-500/20 text-amber-500 hover:bg-amber-500 hover:text-black border border-amber-500/30'
+        }`}
+      >
+        {isRunning ? <Square size={10} className="fill-current" /> : <Play size={10} className="fill-current" />}
+        <span>{isRunning ? formatDisplay(seconds) : (value || '00:00')}</span>
+      </button>
+
+      <button
+        type="button"
+        onClick={handleResetClick}
+        title="Zerar cronômetro e nota"
+        className="p-1 rounded bg-zinc-800 text-slate-400 hover:text-red-400 hover:bg-zinc-700 transition-all border border-white/5"
+      >
+        <RotateCcw size={10} />
+      </button>
+    </div>
   );
 };
 
@@ -253,6 +273,13 @@ const App: React.FC = () => {
   };
 
   const handleTunnelTimeChange = (timeStr: string) => {
+    if (!timeStr || timeStr === '00:00') {
+      updateStateAndSync({
+        ...state,
+        tunnel: { time: '', score: 0 }
+      });
+      return;
+    }
     const secs = parseTimeToSeconds(timeStr);
     let calculatedScore = 0.5;
     if (secs > 100) {
@@ -267,11 +294,18 @@ const App: React.FC = () => {
   };
 
   const handleTrackingTimeChange = (idx: number, timeStr: string) => {
+    const n = [...state.tracking];
+    if (!timeStr || timeStr === '00:00') {
+      n[idx].time = '';
+      n[idx].score = 0;
+      updateStateAndSync({ ...state, tracking: n });
+      return;
+    }
+
     const secs = parseTimeToSeconds(timeStr);
     let calculatedScore = Math.min(1.0, Math.max(0, 1.0 * (secs / 90)));
     calculatedScore = Math.round(calculatedScore * 10) / 10;
 
-    const n = [...state.tracking];
     n[idx].time = timeStr;
     n[idx].score = calculatedScore;
     updateStateAndSync({ ...state, tracking: n });
@@ -425,10 +459,6 @@ const App: React.FC = () => {
     if (window.confirm(`Deseja realmente apagar a ficha da sala ${idToDelete}?`)) {
       await remove(ref(database, `sessions/${idToDelete}`)).catch(err => console.error(err));
       await remove(ref(database, `active_sessions/${idToDelete}`)).catch(err => console.error(err));
-      
-      if (sessionId.toUpperCase() === idToDelete.toUpperCase()) {
-        setActiveTab('dashboard');
-      }
     }
   };
 
@@ -1025,6 +1055,7 @@ const App: React.FC = () => {
                       <InteractiveTimer 
                         value={state.tunnel.time} 
                         onStop={(formatted) => handleTunnelTimeChange(formatted)}
+                        onReset={() => handleTunnelTimeChange('')}
                       />
                       <input 
                         placeholder="00:00" 
@@ -1047,6 +1078,7 @@ const App: React.FC = () => {
                       <InteractiveTimer 
                         value={state.modulation.time} 
                         onStop={(formatted) => updateStateAndSync({...state, modulation: {...state.modulation, time: formatted}})}
+                        onReset={() => updateStateAndSync({...state, modulation: {...state.modulation, time: '', score: 0}})}
                       />
                       <input 
                         placeholder="00:00" 
@@ -1079,6 +1111,7 @@ const App: React.FC = () => {
                             <InteractiveTimer 
                               value={track.time} 
                               onStop={(formatted) => handleTrackingTimeChange(idx, formatted)}
+                              onReset={() => handleTrackingTimeChange(idx, '')}
                             />
                             <input placeholder="00:00" className="bg-transparent outline-none text-[11px] text-amber-500 font-mono w-full text-right" value={track.time} onChange={e => handleTrackingTimeChange(idx, e.target.value)} />
                           </div>
