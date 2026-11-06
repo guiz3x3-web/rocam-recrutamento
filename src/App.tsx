@@ -133,7 +133,6 @@ const App: React.FC = () => {
   const [activeEvaluationsList, setActiveEvaluationsList] = useState<{ [id: string]: { candidateName: string; updatedAt: string } }>({});
   const [showEvaluationsModal, setShowEvaluationsModal] = useState(false);
 
-  // HISTÓRICO SINCRONIZADO GLOBALMENTE NO FIREBASE (Substitui o localStorage isolado)
   const [history, setHistory] = useState<SavedEvaluation[]>([]);
 
   const defaultRamps = [
@@ -162,7 +161,18 @@ const App: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
 
-  // ESCUTA A LISTA DE FICHAS ABERTAS NO FIREBASE EM TEMPO REAL
+  // FUNÇÃO AUXILIAR PARA CONVERTER "MM:SS" EM SEGUNDOS
+  const parseTimeToSeconds = (timeStr: string): number => {
+    if (!timeStr) return 0;
+    const parts = timeStr.split(':');
+    if (parts.length === 2) {
+      const mins = parseInt(parts[0], 10) || 0;
+      const secs = parseInt(parts[1], 10) || 0;
+      return mins * 60 + secs;
+    }
+    return parseFloat(timeStr) || 0;
+  };
+
   useEffect(() => {
     const listRef = ref(database, 'active_sessions');
     const unsubList = onValue(listRef, (snapshot) => {
@@ -176,13 +186,11 @@ const App: React.FC = () => {
     return () => unsubList();
   }, []);
 
-  // ESCUTA O HISTÓRICO GLOBAL NO FIREBASE (Para todos os PCs verem as fichas finalizadas)
   useEffect(() => {
     const historyRef = ref(database, 'global_history');
     const unsubHistory = onValue(historyRef, (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        // Converte o objeto do Firebase num array ordenado
         const historyArray = Object.values(data) as SavedEvaluation[];
         setHistory(historyArray.reverse());
       } else {
@@ -192,7 +200,6 @@ const App: React.FC = () => {
     return () => unsubHistory();
   }, []);
 
-  // ESCUTA A SALA ATUAL SELECIONADA
   useEffect(() => {
     if (!sessionId.trim()) return;
     const sessionRef = ref(database, `sessions/${sessionId.trim().toUpperCase()}`);
@@ -244,6 +251,33 @@ const App: React.FC = () => {
         updatedAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
       }).catch(err => console.error("Erro ao atualizar índice:", err));
     }
+  };
+
+  // CÁLCULO AUTOMÁTICO DO TÚNEL (Máx 0.5pts, referência 1:40 / 100s)
+  const handleTunnelTimeChange = (timeStr: string) => {
+    const secs = parseTimeToSeconds(timeStr);
+    let calculatedScore = 0.5;
+    if (secs > 100) {
+      calculatedScore = Math.max(0, 0.5 * (100 / secs));
+    }
+    calculatedScore = Math.round(calculatedScore * 10) / 10;
+
+    updateStateAndSync({
+      ...state,
+      tunnel: { time: timeStr, score: calculatedScore }
+    });
+  };
+
+  // CÁLCULO AUTOMÁTICO DOS ACOMPANHAMENTOS (Máx 1.0pt, referência 1:30 / 90s)
+  const handleTrackingTimeChange = (idx: number, timeStr: string) => {
+    const secs = parseTimeToSeconds(timeStr);
+    let calculatedScore = Math.min(1.0, Math.max(0, 1.0 * (secs / 90)));
+    calculatedScore = Math.round(calculatedScore * 10) / 10;
+
+    const n = [...state.tracking];
+    n[idx].time = timeStr;
+    n[idx].score = calculatedScore;
+    updateStateAndSync({ ...state, tracking: n });
   };
 
   const protocols = [
@@ -338,7 +372,6 @@ const App: React.FC = () => {
     setShowSettings(false);
   };
 
-  // BOTÃO SALVAR FICHA: Envia os dados atuais para a nuvem globalmente
   const handleSaveOnly = () => {
     setIsSaving(true);
     updateStateAndSync(state);
@@ -350,7 +383,6 @@ const App: React.FC = () => {
     }, 500);
   };
 
-  // BOTÃO FINALIZAR: Guarda permanentemente no histórico global do Firebase
   const handleFinish = async () => {
     if (!state.candidate.name || !state.candidate.id) {
       alert("ERRO: Nome e ID do conscrito são obrigatórios para finalizar.");
@@ -376,7 +408,6 @@ const App: React.FC = () => {
       passingGrade
     };
 
-    // Salva no histórico global do Firebase
     const historyEntryRef = ref(database, `global_history/${entryId}`);
     await set(historyEntryRef, newEntry).catch(err => console.error("Erro ao salvar histórico global:", err));
 
@@ -934,6 +965,7 @@ const App: React.FC = () => {
                 </section>
               </div>
 
+              {/* RAMPAS COM BOTÕES DE ACERTO (0,6) E ERRO (0,0) */}
               <div className="col-span-12 lg:col-span-4 flex flex-col gap-4 overflow-hidden">
                 <section className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-5 space-y-3 flex-1 overflow-y-auto custom-scrollbar">
                   <div className="flex justify-between items-center border-b border-white/5 pb-2">
@@ -942,21 +974,44 @@ const App: React.FC = () => {
                   </div>
                   <div className="space-y-1.5">
                     {state.ramps.map((ramp, idx) => (
-                      <div key={ramp.uid} className="flex gap-3 items-center bg-black/60 border border-white/5 rounded-xl p-2.5 group hover:border-amber-500/30 transition-all">
+                      <div key={ramp.uid} className="flex gap-2 items-center bg-black/60 border border-white/5 rounded-xl p-2.5 group hover:border-amber-500/30 transition-all">
                         <input placeholder="TESTE DE RAMPA" className="flex-1 bg-transparent text-[8px] font-black uppercase outline-none text-slate-300" value={ramp.name} onChange={e => {
                           const n = [...state.ramps]; n[idx].name = e.target.value; updateStateAndSync({...state, ramps: n});
                         }} />
-                        <div className="flex items-center gap-1.5 bg-zinc-950 border border-amber-500/40 rounded px-2.5 py-1 shadow-inner">
-                          <span className="text-[8px] font-black text-amber-600 uppercase tracking-tighter">NOTA:</span>
-                          <input type="number" step="0.5" className="w-10 bg-transparent text-center text-amber-400 text-sm font-black outline-none" value={ramp.score || ''} onChange={e => {
-                            const n = [...state.ramps]; n[idx].score = parseFloat(e.target.value) || 0; updateStateAndSync({...state, ramps: n});
-                          }} />
+                        
+                        <div className="flex items-center gap-1">
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              const n = [...state.ramps]; 
+                              n[idx].score = 0.6; 
+                              updateStateAndSync({...state, ramps: n});
+                            }}
+                            className={`px-2 py-1 rounded text-[8px] font-black uppercase transition-all ${ramp.score === 0.6 ? 'bg-green-500 text-black shadow-md' : 'bg-green-500/20 text-green-500 hover:bg-green-500/30'}`}
+                            title="Acertou (+0,6)"
+                          >
+                            ✓ 0,6
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              const n = [...state.ramps]; 
+                              n[idx].score = 0.0; 
+                              updateStateAndSync({...state, ramps: n});
+                            }}
+                            className={`px-2 py-1 rounded text-[8px] font-black uppercase transition-all ${ramp.score === 0.0 ? 'bg-red-500 text-white shadow-md' : 'bg-red-500/20 text-red-500 hover:bg-red-500/30'}`}
+                            title="Errou (0,0)"
+                          >
+                            ✕ 0,0
+                          </button>
                         </div>
-                        <button onClick={() => updateStateAndSync({...state, ramps: state.ramps.filter(r=>r.uid!==ramp.uid)})} className="text-slate-700 group-hover:text-red-500 transition-colors"><Trash2 size={10}/></button>
+
+                        <button onClick={() => updateStateAndSync({...state, ramps: state.ramps.filter(r=>r.uid!==ramp.uid)})} className="text-slate-700 group-hover:text-red-500 transition-colors ml-1"><Trash2 size={10}/></button>
                       </div>
                     ))}
                   </div>
                 </section>
+                
                 <section className="bg-zinc-900/40 border border-white/5 rounded-[1.5rem] p-4 space-y-3">
                   <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-[0.2em] text-center border-b border-white/5 pb-2 flex items-center justify-center gap-2"><Target size={12}/> RESUMO OPERACIONAL</h3>
                   <div className="space-y-1.5">
@@ -976,30 +1031,33 @@ const App: React.FC = () => {
 
               <div className="col-span-12 lg:col-span-5 flex flex-col gap-4 overflow-hidden">
                 <div className="grid grid-cols-2 gap-3 flex-shrink-0">
+                  
+                  {/* TÚNEL COM CÁLCULO AUTOMÁTICO DE TEMPO (Máx 0.5, ref 1:40) */}
                   <div className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-4 space-y-2.5">
-                    <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><Zap size={14}/> TUNEL</h3>
+                    <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><Zap size={14}/> TUNEL (Máx 0.5)</h3>
                     
                     <div className="flex items-center justify-between gap-2 bg-black/60 border border-white/5 rounded-lg px-2.5 py-1.5">
                       <InteractiveTimer 
                         value={state.tunnel.time} 
-                        onStop={(formatted) => updateStateAndSync({...state, tunnel: {...state.tunnel, time: formatted}})}
+                        onStop={(formatted) => handleTunnelTimeChange(formatted)}
                       />
                       <input 
                         placeholder="00:00" 
                         className="w-full bg-transparent text-[11px] font-black uppercase outline-none text-amber-500 text-right font-mono" 
                         value={state.tunnel.time} 
-                        onChange={e => updateStateAndSync({...state, tunnel: {...state.tunnel, time: e.target.value}})} 
+                        onChange={e => handleTunnelTimeChange(e.target.value)} 
                       />
                     </div>
 
                     <div className="bg-zinc-950 border border-amber-500/40 rounded-lg p-1.5 flex items-center justify-between px-2.5">
-                      <span className="text-[8px] font-black text-amber-600 uppercase tracking-tighter">NOTA:</span>
-                      <input type="number" step="0.5" className="flex-1 bg-transparent text-sm font-black outline-none text-amber-400 text-center" value={state.tunnel.score || ''} onChange={e => updateStateAndSync({...state, tunnel: {...state.tunnel, score: parseFloat(e.target.value) || 0}})} />
+                      <span className="text-[8px] font-black text-amber-600 uppercase tracking-tighter">NOTA AUTO:</span>
+                      <span className="text-sm font-black text-amber-400">{state.tunnel.score.toFixed(1)}</span>
                     </div>
                   </div>
 
+                  {/* MODULAÇÃO CHINA MANUAL */}
                   <div className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-4 space-y-2.5">
-                    <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><Activity size={14}/> MOD. CHINA</h3>
+                    <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><Activity size={14}/> MOD. CHINA (Manual)</h3>
                     
                     <div className="flex items-center justify-between gap-2 bg-black/60 border border-white/5 rounded-lg px-2.5 py-1.5">
                       <InteractiveTimer 
@@ -1021,9 +1079,10 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
+                {/* ACOMPANHAMENTOS (PRAIA, GROOVE, MANSÕES) COM CÁLCULO AUTOMÁTICO (Máx 1.0, ref 1:30) */}
                 <section className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-5 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
                   <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                    <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><ClipboardCheck size={14}/> ACOMPANHAMENTOS</h3>
+                    <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><ClipboardCheck size={14}/> ACOMPANHAMENTOS (Máx 1.0)</h3>
                     <button onClick={() => updateStateAndSync({...state, tracking: [...state.tracking, {uid:Math.random().toString(), location:'', time:'', score:0}]})} className="p-1.5 bg-amber-500/10 text-amber-500 rounded-lg hover:bg-amber-500/20 transition-all"><Plus size={12}/></button>
                   </div>
                   <div className="space-y-2.5">
@@ -1036,23 +1095,15 @@ const App: React.FC = () => {
                           <div className="flex items-center justify-between gap-2">
                             <InteractiveTimer 
                               value={track.time} 
-                              onStop={(formatted) => {
-                                const n = [...state.tracking];
-                                n[idx].time = formatted;
-                                updateStateAndSync({...state, tracking: n});
-                              }}
+                              onStop={(formatted) => handleTrackingTimeChange(idx, formatted)}
                             />
-                            <input placeholder="00:00" className="bg-transparent outline-none text-[11px] text-amber-500 font-mono w-full text-right" value={track.time} onChange={e => {
-                              const n = [...state.tracking]; n[idx].time = e.target.value; updateStateAndSync({...state, tracking: n});
-                            }} />
+                            <input placeholder="00:00" className="bg-transparent outline-none text-[11px] text-amber-500 font-mono w-full text-right" value={track.time} onChange={e => handleTrackingTimeChange(idx, e.target.value)} />
                           </div>
                         </div>
                         <div className="flex items-center gap-3 border-l border-white/5 pl-3 ml-3">
                           <div className="flex flex-col items-center bg-zinc-950 border border-amber-500/30 rounded py-1.5 px-3 shadow-inner">
                             <span className="text-[7px] font-black text-amber-600 uppercase mb-0.5 tracking-tighter">NOTA</span>
-                            <input type="number" step="0.5" className="w-10 bg-transparent text-center text-amber-400 text-lg font-black outline-none" value={track.score || ''} onChange={e => {
-                              const n = [...state.tracking]; n[idx].score = parseFloat(e.target.value) || 0; updateStateAndSync({...state, tracking: n});
-                            }} />
+                            <span className="text-lg font-black text-amber-400">{track.score.toFixed(1)}</span>
                           </div>
                           <button onClick={() => updateStateAndSync({...state, tracking: state.tracking.filter(t=>t.uid!==track.uid)})} className="text-slate-700 group-hover:text-red-500 transition-colors"><Trash2 size={12}/></button>
                         </div>
