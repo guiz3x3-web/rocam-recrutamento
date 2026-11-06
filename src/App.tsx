@@ -167,7 +167,7 @@ const App: React.FC = () => {
     { level: 'DIFÍCIL', q: 'Posicionamento em "L" na abordagem?', a: 'P1 lateral, P2 diagonal, P3 retaguarda.' },
     { level: 'DIFÍCIL', q: 'Diferença tática no Alto Risco?', a: 'Motos rotacionam no próprio eixo apontando arma, sempre em movimento.' },
     { level: 'DIFÍCIL', q: 'Conduta em COD 5 de invasão?', a: 'Priorizar cerco tático e pontos elevados para cobertura.' },
-    { level: 'DIFÍCIL', q: 'Regra sobre empinar a moto?', a: 'Apenas se o meliante empinar primeiro ou veículo desproporcional.' },
+    { level: 'DIFÍCIL', q: 'Regra sobre empinar a moto?', a: 'Apenas se o meliante empinar primeiro ou veículo desproporcional..' },
     { level: 'DIFÍCIL', q: 'Regra de retorno após queda?', a: 'A decisão de retorno é exclusivamente do suspeito, o oficial nunca pede.' }
   ];
 
