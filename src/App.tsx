@@ -294,7 +294,7 @@ const App: React.FC = () => {
   };
 
   const handleTrackingTimeChange = (idx: number, timeStr: string) => {
-    const n = [...state.tracking];
+    const n = [...(state?.tracking || defaultTracking)];
     if (!timeStr || timeStr === '00:00') {
       n[idx].time = '';
       n[idx].score = 0;
@@ -335,10 +335,10 @@ const App: React.FC = () => {
   ];
 
   const categoryScores = useMemo(() => {
-    const rampsSum = state.ramps.reduce((acc, r) => acc + (Number(r.score) || 0), 0);
-    const trackingSum = state.tracking.reduce((acc, t) => acc + (Number(t.score) || 0), 0);
-    const tunnelScore = Number(state.tunnel.score) || 0;
-    const modulationScore = Number(state.modulation.score) || 0;
+    const rampsSum = (state?.ramps || []).reduce((acc, r) => acc + (Number(r.score) || 0), 0);
+    const trackingSum = (state?.tracking || []).reduce((acc, t) => acc + (Number(t.score) || 0), 0);
+    const tunnelScore = Number(state?.tunnel?.score) || 0;
+    const modulationScore = Number(state?.modulation?.score) || 0;
     
     return {
       ramps: rampsSum,
@@ -353,20 +353,20 @@ const App: React.FC = () => {
   const isApprovedNow = finalScore >= passingGrade;
 
   const stats = useMemo(() => {
-    const total = history.length;
+    const total = history?.length || 0;
     if (total === 0) return { total: 0, approved: 0, rejected: 0, rate: 0, avgScore: '0.0' };
-    const approved = history.filter(h => h.finalScore >= h.passingGrade).length;
+    const approved = (history || []).filter(h => h.finalScore >= h.passingGrade).length;
     const rejected = total - approved;
     const rate = Math.round((approved / total) * 100);
-    const avgScore = (history.reduce((acc, h) => acc + h.finalScore, 0) / total).toFixed(1);
+    const avgScore = ((history || []).reduce((acc, h) => acc + h.finalScore, 0) / total).toFixed(1);
     return { total, approved, rejected, rate, avgScore };
   }, [history]);
 
   const topInstructors = useMemo(() => {
     const map: { [name: string]: { count: number; approved: number } } = {};
-    history.forEach(item => {
-      item.state.instructors.forEach(ins => {
-        const key = ins.name.trim().toUpperCase();
+    (history || []).forEach(item => {
+      (item?.state?.instructors || []).forEach(ins => {
+        const key = ins?.name?.trim()?.toUpperCase();
         if (key) {
           if (!map[key]) map[key] = { count: 0, approved: 0 };
           map[key].count += 1;
@@ -415,7 +415,7 @@ const App: React.FC = () => {
   };
 
   const handleFinish = async () => {
-    if (!state.candidate.name || !state.candidate.id) {
+    if (!state?.candidate?.name || !state?.candidate?.id) {
       alert("ERRO: Nome e ID do conscrito são obrigatórios para finalizar.");
       return;
     }
@@ -625,8 +625,8 @@ const App: React.FC = () => {
                 <div className="space-y-6">
                   <div>
                     <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-1">Candidato Avaliado</span>
-                    <h3 className="text-4xl font-bold text-white uppercase tracking-tighter">{selectedResult.state.candidate.name}</h3>
-                    <p className="text-[9px] text-slate-600 font-mono mt-1">ID: {selectedResult.state.candidate.id} • DATA: {selectedResult.date}</p>
+                    <h3 className="text-4xl font-bold text-white uppercase tracking-tighter">{selectedResult?.state?.candidate?.name}</h3>
+                    <p className="text-[9px] text-slate-600 font-mono mt-1">ID: {selectedResult?.state?.candidate?.id} • DATA: {selectedResult.date}</p>
                   </div>
                   
                   <div className="flex items-center gap-6 bg-zinc-900/40 p-8 rounded-[2rem] border border-white/5">
@@ -646,7 +646,7 @@ const App: React.FC = () => {
 
                 <div className="bg-zinc-900/20 p-8 rounded-[2rem] border border-white/5 space-y-4">
                   <h4 className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><Trophy className="w-4 h-4"/> Parecer Tático</h4>
-                  <p className="text-sm leading-relaxed italic text-slate-400">"{selectedResult.review.summary}"</p>
+                  <p className="text-sm leading-relaxed italic text-slate-400">"{selectedResult?.review?.summary}"</p>
                 </div>
               </div>
 
@@ -660,10 +660,10 @@ const App: React.FC = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div className="bg-zinc-900/40 p-6 rounded-2xl border border-white/5">
                     <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest block mb-4 border-b border-white/5 pb-2">Rampas</span>
-                    {selectedResult.state.ramps.map((r, i) => (
+                    {(selectedResult?.state?.ramps || []).map((r, i) => (
                       <div key={i} className="flex justify-between text-[11px] font-bold uppercase mb-1 last:mb-0">
                         <span className="text-slate-500">{r.name}</span>
-                        <span className="text-amber-500">{r.score.toFixed(1)}</span>
+                        <span className="text-amber-500">{(r.score || 0).toFixed(1)}</span>
                       </div>
                     ))}
                   </div>
@@ -671,19 +671,19 @@ const App: React.FC = () => {
                     <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest block mb-4 border-b border-white/5 pb-2">Circuitos</span>
                     <div className="flex justify-between text-[11px] font-bold uppercase mb-2">
                       <span className="text-slate-500">TÚNEL</span>
-                      <span className="text-amber-500">{selectedResult.state.tunnel.score.toFixed(1)}</span>
+                      <span className="text-amber-500">{(selectedResult?.state?.tunnel?.score || 0).toFixed(1)}</span>
                     </div>
                     <div className="flex justify-between text-[11px] font-bold uppercase">
                       <span className="text-slate-500">CHINA</span>
-                      <span className="text-amber-500">{selectedResult.state.modulation.score.toFixed(1)}</span>
+                      <span className="text-amber-500">{(selectedResult?.state?.modulation?.score || 0).toFixed(1)}</span>
                     </div>
                   </div>
                   <div className="bg-zinc-900/40 p-6 rounded-2xl border border-white/5">
                     <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest block mb-4 border-b border-white/5 pb-2">Acomp.</span>
-                    {selectedResult.state.tracking.map((t, i) => (
+                    {(selectedResult?.state?.tracking || []).map((t, i) => (
                       <div key={i} className="flex justify-between text-[11px] font-bold uppercase mb-1 last:mb-0">
                         <span className="text-slate-500">{t.location || 'SETOR'}</span>
-                        <span className="text-amber-500">{t.score.toFixed(1)}</span>
+                        <span className="text-amber-500">{(t.score || 0).toFixed(1)}</span>
                       </div>
                     ))}
                   </div>
@@ -693,7 +693,7 @@ const App: React.FC = () => {
               <div className="pt-6 border-t border-white/5">
                 <span className="text-[8px] font-black text-slate-700 uppercase block mb-2">Equipe de Instrutores:</span>
                 <div className="flex flex-wrap gap-2">
-                  {selectedResult.state.instructors.map((ins, i) => (
+                  {(selectedResult?.state?.instructors || []).map((ins, i) => (
                     <div key={i} className="text-[9px] font-bold bg-zinc-900 border border-white/5 px-3 py-1 rounded-lg text-slate-400">
                       {ins.name} (ID: {ins.id})
                     </div>
@@ -876,8 +876,8 @@ const App: React.FC = () => {
                           {item.finalScore >= item.passingGrade ? <UserCheck size={16}/> : <UserX size={16}/>}
                         </div>
                         <div>
-                          <h4 className="text-xs font-bold text-white uppercase">{item.state.candidate.name}</h4>
-                          <span className="text-[8px] text-slate-500 font-mono uppercase">ID: {item.state.candidate.id} • {item.date}</span>
+                          <h4 className="text-xs font-bold text-white uppercase">{item?.state?.candidate?.name}</h4>
+                          <span className="text-[8px] text-slate-500 font-mono uppercase">ID: {item?.state?.candidate?.id} • {item.date}</span>
                         </div>
                       </div>
 
@@ -931,18 +931,18 @@ const App: React.FC = () => {
                 <section className="bg-zinc-900/50 border border-amber-500/10 rounded-[1.2rem] p-4 space-y-2.5">
                   <div className="flex justify-between items-center">
                     <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><Users size={12}/> Instrutores</h3>
-                    <button onClick={() => updateStateAndSync({...state, instructors: [...state.instructors, {id:'', name:''}]})} className="p-1 bg-amber-500/10 text-amber-500 rounded-md hover:bg-amber-500/20"><Plus size={10}/></button>
+                    <button onClick={() => updateStateAndSync({...state, instructors: [...(state?.instructors || []), {id:'', name:''}]})} className="p-1 bg-amber-500/10 text-amber-500 rounded-md hover:bg-amber-500/20"><Plus size={10}/></button>
                   </div>
-                  {state.instructors.map((ins, idx) => (
+                  {(state?.instructors || []).map((ins, idx) => (
                     <div key={idx} className="space-y-1 group relative">
-                      <input placeholder="NOME INSTRUTOR" className="w-full bg-black/60 border border-white/5 rounded-lg p-2 text-[10px] uppercase font-bold focus:border-amber-500 outline-none" value={ins.name} onChange={e => {
-                        const n = [...state.instructors]; n[idx].name = e.target.value; updateStateAndSync({...state, instructors: n});
+                      <input placeholder="NOME INSTRUTOR" className="w-full bg-black/60 border border-white/5 rounded-lg p-2 text-[10px] uppercase font-bold focus:border-amber-500 outline-none" value={ins?.name || ''} onChange={e => {
+                        const n = [...(state?.instructors || [])]; n[idx].name = e.target.value; updateStateAndSync({...state, instructors: n});
                       }} />
-                      <input placeholder="ID" className="w-full bg-black/60 border border-white/5 rounded-lg p-2 text-[10px] font-bold focus:border-amber-500 outline-none" value={ins.id} onChange={e => {
-                        const n = [...state.instructors]; n[idx].id = e.target.value; updateStateAndSync({...state, instructors: n});
+                      <input placeholder="ID" className="w-full bg-black/60 border border-white/5 rounded-lg p-2 text-[10px] font-bold focus:border-amber-500 outline-none" value={ins?.id || ''} onChange={e => {
+                        const n = [...(state?.instructors || [])]; n[idx].id = e.target.value; updateStateAndSync({...state, instructors: n});
                       }} />
-                      {state.instructors.length > 1 && (
-                        <button onClick={() => updateStateAndSync({...state, instructors: state.instructors.filter((_, i) => i !== idx)})} className="absolute top-0 right-0 p-1 text-slate-800 hover:text-red-500 transition-colors"><X size={8}/></button>
+                      {(state?.instructors || []).length > 1 && (
+                        <button onClick={() => updateStateAndSync({...state, instructors: (state?.instructors || []).filter((_, i) => i !== idx)})} className="absolute top-0 right-0 p-1 text-slate-800 hover:text-red-500 transition-colors"><X size={8}/></button>
                       )}
                     </div>
                   ))}
@@ -950,8 +950,8 @@ const App: React.FC = () => {
 
                 <section className="bg-zinc-900/50 border border-amber-500/10 rounded-[1.2rem] p-4 space-y-2.5">
                   <h3 className="text-[10px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><User size={12}/> Conscrito</h3>
-                  <input placeholder="NOME DO CONSRITO" className="w-full bg-black/60 border border-white/5 rounded-lg p-2 text-[10px] uppercase font-bold outline-none focus:border-amber-500" value={state.candidate.name} onChange={e => updateStateAndSync({...state, candidate: {...state.candidate, name: e.target.value}})} />
-                  <input placeholder="ID / PASSAPORTE" className="w-full bg-black/60 border border-white/5 rounded-lg p-2 text-[10px] font-bold outline-none focus:border-amber-500" value={state.candidate.id} onChange={e => updateStateAndSync({...state, candidate: {...state.candidate, id: e.target.value}})} />
+                  <input placeholder="NOME DO CONSRITO" className="w-full bg-black/60 border border-white/5 rounded-lg p-2 text-[10px] uppercase font-bold outline-none focus:border-amber-500" value={state?.candidate?.name || ''} onChange={e => updateStateAndSync({...state, candidate: {...(state?.candidate || {id:''}), name: e.target.value}})} />
+                  <input placeholder="ID / PASSAPORTE" className="w-full bg-black/60 border border-white/5 rounded-lg p-2 text-[10px] font-bold outline-none focus:border-amber-500" value={state?.candidate?.id || ''} onChange={e => updateStateAndSync({...state, candidate: {...(state?.candidate || {name:''}), id: e.target.value}})} />
                 </section>
 
                 <section className="bg-zinc-900/50 border border-amber-500/20 rounded-[1.2rem] p-4 flex flex-col gap-2.5 mt-auto">
@@ -987,24 +987,24 @@ const App: React.FC = () => {
                 <section className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-5 space-y-3 flex-1 overflow-y-auto custom-scrollbar">
                   <div className="flex justify-between items-center border-b border-white/5 pb-2">
                     <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><MapPin size={14}/> CIRCUITO DE RAMPAS</h3>
-                    <button onClick={() => updateStateAndSync({...state, ramps: [...state.ramps, {uid:Math.random().toString(), name:'', score:0}]})} className="p-1.5 bg-amber-500/10 text-amber-500 rounded-lg hover:bg-amber-500/20 transition-all"><Plus size={12}/></button>
+                    <button onClick={() => updateStateAndSync({...state, ramps: [...(state?.ramps || []), {uid:Math.random().toString(), name:'', score:0}]})} className="p-1.5 bg-amber-500/10 text-amber-500 rounded-lg hover:bg-amber-500/20 transition-all"><Plus size={12}/></button>
                   </div>
                   <div className="space-y-1.5">
-                    {state.ramps.map((ramp, idx) => (
-                      <div key={ramp.uid} className="flex gap-2 items-center bg-black/60 border border-white/5 rounded-xl p-2.5 group hover:border-amber-500/30 transition-all">
-                        <input placeholder="TESTE DE RAMPA" className="flex-1 bg-transparent text-[8px] font-black uppercase outline-none text-slate-300" value={ramp.name} onChange={e => {
-                          const n = [...state.ramps]; n[idx].name = e.target.value; updateStateAndSync({...state, ramps: n});
+                    {(state?.ramps || []).map((ramp, idx) => (
+                      <div key={ramp?.uid || idx} className="flex gap-2 items-center bg-black/60 border border-white/5 rounded-xl p-2.5 group hover:border-amber-500/30 transition-all">
+                        <input placeholder="TESTE DE RAMPA" className="flex-1 bg-transparent text-[8px] font-black uppercase outline-none text-slate-300" value={ramp?.name || ''} onChange={e => {
+                          const n = [...(state?.ramps || [])]; n[idx].name = e.target.value; updateStateAndSync({...state, ramps: n});
                         }} />
                         
                         <div className="flex items-center gap-1">
                           <button 
                             type="button"
                             onClick={() => {
-                              const n = [...state.ramps]; 
+                              const n = [...(state?.ramps || [])]; 
                               n[idx].score = 0.6; 
                               updateStateAndSync({...state, ramps: n});
                             }}
-                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${ramp.score === 0.6 ? 'bg-green-500 text-black shadow-lg scale-105' : 'bg-green-500/20 text-green-500 hover:bg-green-500/30'}`}
+                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${ramp?.score === 0.6 ? 'bg-green-500 text-black shadow-lg scale-105' : 'bg-green-500/20 text-green-500 hover:bg-green-500/30'}`}
                             title="Acertou (+0,6)"
                           >
                             ✓
@@ -1012,18 +1012,18 @@ const App: React.FC = () => {
                           <button 
                             type="button"
                             onClick={() => {
-                              const n = [...state.ramps]; 
+                              const n = [...(state?.ramps || [])]; 
                               n[idx].score = 0.0; 
                               updateStateAndSync({...state, ramps: n});
                             }}
-                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${ramp.score === 0.0 ? 'bg-red-500 text-white shadow-lg scale-105' : 'bg-red-500/20 text-red-500 hover:bg-red-500/30'}`}
+                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${ramp?.score === 0.0 ? 'bg-red-500 text-white shadow-lg scale-105' : 'bg-red-500/20 text-red-500 hover:bg-red-500/30'}`}
                             title="Errou (0,0)"
                           >
                             ✕
                           </button>
                         </div>
 
-                        <button onClick={() => updateStateAndSync({...state, ramps: state.ramps.filter(r=>r.uid!==ramp.uid)})} className="text-slate-700 group-hover:text-red-500 transition-colors ml-1"><Trash2 size={10}/></button>
+                        <button onClick={() => updateStateAndSync({...state, ramps: (state?.ramps || []).filter(r=>r.uid!==ramp.uid)})} className="text-slate-700 group-hover:text-red-500 transition-colors ml-1"><Trash2 size={10}/></button>
                       </div>
                     ))}
                   </div>
@@ -1053,21 +1053,21 @@ const App: React.FC = () => {
                     
                     <div className="flex items-center justify-between gap-2 bg-black/60 border border-white/5 rounded-lg px-2.5 py-1.5">
                       <InteractiveTimer 
-                        value={state.tunnel.time} 
+                        value={state?.tunnel?.time || ''} 
                         onStop={(formatted) => handleTunnelTimeChange(formatted)}
                         onReset={() => handleTunnelTimeChange('')}
                       />
                       <input 
                         placeholder="00:00" 
                         className="w-full bg-transparent text-[11px] font-black uppercase outline-none text-amber-500 text-right font-mono" 
-                        value={state.tunnel.time} 
+                        value={state?.tunnel?.time || ''} 
                         onChange={e => handleTunnelTimeChange(e.target.value)} 
                       />
                     </div>
 
                     <div className="bg-zinc-950 border border-amber-500/40 rounded-lg p-1.5 flex items-center justify-between px-2.5">
                       <span className="text-[8px] font-black text-amber-600 uppercase tracking-tighter">NOTA AUTO:</span>
-                      <span className="text-sm font-black text-amber-400">{state.tunnel.score.toFixed(1)}</span>
+                      <span className="text-sm font-black text-amber-400">{(state?.tunnel?.score || 0).toFixed(1)}</span>
                     </div>
                   </div>
 
@@ -1076,21 +1076,21 @@ const App: React.FC = () => {
                     
                     <div className="flex items-center justify-between gap-2 bg-black/60 border border-white/5 rounded-lg px-2.5 py-1.5">
                       <InteractiveTimer 
-                        value={state.modulation.time} 
-                        onStop={(formatted) => updateStateAndSync({...state, modulation: {...state.modulation, time: formatted}})}
-                        onReset={() => updateStateAndSync({...state, modulation: {...state.modulation, time: '', score: 0}})}
+                        value={state?.modulation?.time || ''} 
+                        onStop={(formatted) => updateStateAndSync({...state, modulation: {...(state?.modulation || {time:'', score:0}), time: formatted}})}
+                        onReset={() => updateStateAndSync({...state, modulation: {...(state?.modulation || {time:'', score:0}), time: '', score: 0}})}
                       />
                       <input 
                         placeholder="00:00" 
                         className="w-full bg-transparent text-[11px] font-black uppercase outline-none text-amber-500 text-right font-mono" 
-                        value={state.modulation.time} 
-                        onChange={e => updateStateAndSync({...state, modulation: {...state.modulation, time: e.target.value}})} 
+                        value={state?.modulation?.time || ''} 
+                        onChange={e => updateStateAndSync({...state, modulation: {...(state?.modulation || {time:'', score:0}), time: e.target.value}})} 
                       />
                     </div>
 
                     <div className="bg-zinc-950 border border-amber-500/40 rounded-lg p-1.5 flex items-center justify-between px-2.5">
                       <span className="text-[8px] font-black text-amber-600 uppercase tracking-tighter">NOTA:</span>
-                      <input type="number" step="0.5" className="flex-1 bg-transparent text-sm font-black outline-none text-amber-400 text-center" value={state.modulation.score || ''} onChange={e => updateStateAndSync({...state, modulation: {...state.modulation, score: parseFloat(e.target.value) || 0}})} />
+                      <input type="number" step="0.5" className="flex-1 bg-transparent text-sm font-black outline-none text-amber-400 text-center" value={state?.modulation?.score || ''} onChange={e => updateStateAndSync({...state, modulation: {...(state?.modulation || {time:'', score:0}), score: parseFloat(e.target.value) || 0}})} />
                     </div>
                   </div>
                 </div>
@@ -1098,30 +1098,30 @@ const App: React.FC = () => {
                 <section className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-5 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
                   <div className="flex justify-between items-center border-b border-white/5 pb-2">
                     <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><ClipboardCheck size={14}/> ACOMPANHAMENTOS (Máx 1.0)</h3>
-                    <button onClick={() => updateStateAndSync({...state, tracking: [...state.tracking, {uid:Math.random().toString(), location:'', time:'', score:0}]})} className="p-1.5 bg-amber-500/10 text-amber-500 rounded-lg hover:bg-amber-500/20 transition-all"><Plus size={12}/></button>
+                    <button onClick={() => updateStateAndSync({...state, tracking: [...(state?.tracking || []), {uid:Math.random().toString(), location:'', time:'', score:0}]})} className="p-1.5 bg-amber-500/10 text-amber-500 rounded-lg hover:bg-amber-500/20 transition-all"><Plus size={12}/></button>
                   </div>
                   <div className="space-y-2.5">
-                    {state.tracking.map((track, idx) => (
-                      <div key={track.uid} className="bg-black/60 border border-white/5 rounded-xl p-3 flex items-center justify-between group transition-all hover:border-amber-500/30">
+                    {(state?.tracking || []).map((track, idx) => (
+                      <div key={track?.uid || idx} className="bg-black/60 border border-white/5 rounded-xl p-3 flex items-center justify-between group transition-all hover:border-amber-500/30">
                         <div className="flex-1 space-y-1.5">
-                          <input placeholder="SETOR / ROTA" className="w-full bg-transparent text-[10px] font-black uppercase outline-none text-slate-400" value={track.location} onChange={e => {
-                            const n = [...state.tracking]; n[idx].location = e.target.value; updateStateAndSync({...state, tracking: n});
+                          <input placeholder="SETOR / ROTA" className="w-full bg-transparent text-[10px] font-black uppercase outline-none text-slate-400" value={track?.location || ''} onChange={e => {
+                            const n = [...(state?.tracking || [])]; n[idx].location = e.target.value; updateStateAndSync({...state, tracking: n});
                           }} />
                           <div className="flex items-center justify-between gap-2">
                             <InteractiveTimer 
-                              value={track.time} 
+                              value={track?.time || ''} 
                               onStop={(formatted) => handleTrackingTimeChange(idx, formatted)}
                               onReset={() => handleTrackingTimeChange(idx, '')}
                             />
-                            <input placeholder="00:00" className="bg-transparent outline-none text-[11px] text-amber-500 font-mono w-full text-right" value={track.time} onChange={e => handleTrackingTimeChange(idx, e.target.value)} />
+                            <input placeholder="00:00" className="bg-transparent outline-none text-[11px] text-amber-500 font-mono w-full text-right" value={track?.time || ''} onChange={e => handleTrackingTimeChange(idx, e.target.value)} />
                           </div>
                         </div>
                         <div className="flex items-center gap-3 border-l border-white/5 pl-3 ml-3">
                           <div className="flex flex-col items-center bg-zinc-950 border border-amber-500/30 rounded py-1.5 px-3 shadow-inner">
                             <span className="text-[7px] font-black text-amber-600 uppercase mb-0.5 tracking-tighter">NOTA</span>
-                            <span className="text-lg font-black text-amber-400">{track.score.toFixed(1)}</span>
+                            <span className="text-lg font-black text-amber-400">{(track?.score || 0).toFixed(1)}</span>
                           </div>
-                          <button onClick={() => updateStateAndSync({...state, tracking: state.tracking.filter(t=>t.uid!==track.uid)})} className="text-slate-700 group-hover:text-red-500 transition-colors"><Trash2 size={12}/></button>
+                          <button onClick={() => updateStateAndSync({...state, tracking: (state?.tracking || []).filter(t=>t.uid!==track.uid)})} className="text-slate-700 group-hover:text-red-500 transition-colors"><Trash2 size={12}/></button>
                         </div>
                       </div>
                     ))}
@@ -1187,13 +1187,13 @@ const App: React.FC = () => {
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
                           <span className="text-[7px] font-black bg-amber-500/20 px-1.5 py-0.5 rounded text-amber-500 uppercase tracking-tighter">Conscrito</span>
-                          <h3 className="text-sm font-bold uppercase text-white tracking-tight">{item.state.candidate.name}</h3>
+                          <h3 className="text-sm font-bold uppercase text-white tracking-tight">{item?.state?.candidate?.name}</h3>
                         </div>
                         <div className="flex gap-2 text-[9px] text-slate-500 font-bold uppercase mt-0.5 items-center">
                           <span className="flex items-center gap-1">
                             <Users size={10} className="text-amber-500"/> 
                             <span className="text-slate-400">Instrutor:</span>
-                            <span className="text-white">{item.state.instructors[0]?.name || 'N/A'}</span>
+                            <span className="text-white">{item?.state?.instructors?.[0]?.name || 'N/A'}</span>
                           </span>
                           <span className="opacity-20">|</span>
                           <span className="text-slate-600 font-mono">{item.date}</span>
