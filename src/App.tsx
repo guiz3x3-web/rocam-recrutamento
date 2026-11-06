@@ -36,7 +36,7 @@ import { RecruitmentState, SavedEvaluation, AIReviewResult } from './types';
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, onValue, set } from "firebase/database";
 
-// CONFIGURAÇÃO DIRETA DO FIREBASE (EVITA ERROS DE MÓDULO)
+// CONFIGURAÇÃO DIRETA DO FIREBASE
 const firebaseConfig = {
   apiKey: "AIzaSyA6l96IKSBHh9Kg10Hb0uXWTqNvH4rEq54",
   authDomain: "recrutamento-rocam-96e76.firebaseapp.com",
@@ -50,7 +50,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
 
-const gtmLogo = 'https://i.imgur.com/HJ1Efmn.jpeg';
+const gtmLogo = '/guarnicao_gtm_cinza_camuflado_fundo_transparente_final.png';
 
 interface TimerButtonProps {
   value: string;
@@ -349,8 +349,12 @@ const App: React.FC = () => {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-[#171717] font-sans select-none relative overflow-hidden">
         <div className="w-full max-w-md p-8 bg-[#1f1f1f] border border-amber-500/40 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col items-center text-center">
-          <div className="w-28 h-28 bg-[#121212] border border-white/10 rounded-2xl flex items-center justify-center p-2 mb-4 shadow-inner">
-            <img src={gtmLogo} alt="GTM Logo" className="w-full h-full object-contain" />
+          <div className="w-28 h-28 rounded-2xl flex items-center justify-center mb-4">
+            <img 
+              src={gtmLogo} 
+              alt="GTM Logo" 
+              className="w-full h-full object-contain filter drop-shadow-[0_0_12px_rgba(245,158,11,0.2)]" 
+            />
           </div>
           <h1 className="text-2xl font-black text-amber-500 tracking-wider uppercase mb-1">GTM</h1>
           <h2 className="text-[11px] font-black text-white uppercase tracking-widest mb-1">GRUPAMENTO TÁTICO DE MOTOCICLETAS</h2>
