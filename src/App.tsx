@@ -1,28 +1,3 @@
-Excelente escolha! O **Ranking de Desempenho / Top Instrutores** encaixa perfeitamente no visual *Futurist Tech Dashboard* do GTM, valorizando o trabalho da equipe de instrução e mantendo o painel moderno e dinâmico.
-
----
-
-### 🏆 Como fica a estrutura da Opção 1:
-
-1. **Card Principal:** Subtitle "LIDERANÇA DE INSTRUÇÃO" com bordas finas em dourado metálico (`amber-500`).
-
-
-2. **Item de Destaque (1º Lugar):**
-* Avatar com borda dourada piscando/brilhando + Badge de "TOP INSTRUTOR DO MÊS".
-* Nome do instrutor + ID + Quantidade de avaliações concluídas + Taxa de aprovação dos conscritos dele.
-
-
-3. **Lista dos Demais Instrutores (2º ao 4º Lugar):**
-* Posição (#2, #3, #4), Nome, ID e Total de fichas assinadas.
-
-
-4. **Métrica da Equipe:** Uma barra sutil indicando a média de fichas por instrutor no mês atual.
-
----
-
-Aqui está o **`App.tsx`** completo, finalizado, corrigido e pronto com o **Ranking de Instrutores** no lugar dos Pontos Críticos e com o caminho da logo ajustado para a pasta `public/`:
-
-```tsx
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   Shield, 
@@ -58,10 +33,9 @@ import {
 } from 'lucide-react';
 import { RecruitmentState, SavedEvaluation, AIReviewResult } from './types';
 
-// Caminho estático direto da pasta public (evita erro de import no build do Netlify)
+// Caminho estático direto da pasta public
 const gtmLogo = '/guarnicao_gtm_cinza_camuflado_fundo_transparente_final.png';
 
-// --- COMPONENTE REUTILIZÁVEL DE CRONÔMETRO INTERATIVO ---
 interface TimerButtonProps {
   value: string;
   onStop: (formattedTime: string) => void;
@@ -225,7 +199,6 @@ const App: React.FC = () => {
     return { total, approved, rejected, rate, avgScore };
   }, [history]);
 
-  // Ranking dinâmico dos instrutores baseado no histórico
   const topInstructors = useMemo(() => {
     const map: { [name: string]: { count: number; approved: number } } = {};
     history.forEach(item => {
@@ -321,7 +294,6 @@ const App: React.FC = () => {
     }
   };
 
-  // --- TELA DE LOGIN ---
   if (!isAuthenticated) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-[#171717] font-sans select-none relative overflow-hidden">
@@ -388,7 +360,6 @@ const App: React.FC = () => {
     );
   }
 
-  // --- APLICAÇÃO PRINCIPAL LOGADA ---
   return (
     <div className="h-screen w-full flex flex-col bg-black text-slate-300 overflow-hidden font-sans select-none">
       
@@ -506,7 +477,6 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* HEADER DA APLICAÇÃO */}
       <header className="px-8 py-3 flex items-center justify-between bg-zinc-950 border-b border-amber-500/20 flex-shrink-0 z-50">
         <div className="flex items-center gap-4">
           <img src={gtmLogo} alt="GTM Logo" className="w-10 h-10 object-contain drop-shadow-[0_0_10px_rgba(245,158,11,0.3)]" />
@@ -536,11 +506,9 @@ const App: React.FC = () => {
 
       <main className="flex-1 overflow-hidden p-4 bg-[radial-gradient(circle_at_center,_#1f1f23_0%,_#09090b_100%)] relative">
         
-        {/* TAB DASHBOARD / INÍCIO */}
         {activeTab === 'dashboard' && (
           <div className="h-full max-w-6xl mx-auto flex flex-col gap-5 overflow-y-auto custom-scrollbar animate-in fade-in duration-500">
             
-            {/* CARDS KPI SUPERIORES */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-4 flex items-center justify-between">
                 <div>
@@ -583,10 +551,8 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* SEÇÃO PRINCIPAL: GRÁFICO E RANKING DE INSTRUTORES */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
               
-              {/* GRÁFICO VISUAL DE RECRUTAMENTO */}
               <div className="lg:col-span-2 bg-zinc-900/40 border border-white/5 rounded-2xl p-6 flex flex-col justify-between space-y-6">
                 <div className="flex justify-between items-center border-b border-white/5 pb-3">
                   <div>
@@ -599,7 +565,6 @@ const App: React.FC = () => {
                   </div>
                 </div>
 
-                {/* BARRAS VISUAIS DE ANALYTICS */}
                 <div className="h-48 flex items-end justify-between gap-4 pt-6 px-4 border-b border-white/5">
                   {['SET', 'OUT', 'NOV', 'DEZ'].map((month, idx) => {
                     const approvedHeight = idx === 2 ? (stats.approved ? Math.min(stats.approved * 20, 100) : 40) : (idx + 1) * 20;
@@ -624,7 +589,6 @@ const App: React.FC = () => {
                 </div>
               </div>
 
-              {/* OPÇÃO 1: RANKING DE DESEMPENHO / TOP INSTRUTORES */}
               <div className="flex flex-col gap-4">
                 <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-5 flex-1 flex flex-col justify-between">
                   <div>
@@ -668,7 +632,6 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            {/* PRÉVIA DO HISTÓRICO */}
             <div className="bg-zinc-900/40 border border-white/5 rounded-2xl p-6">
               <div className="flex justify-between items-center border-b border-white/5 pb-3 mb-4">
                 <h3 className="text-xs font-black text-amber-500 uppercase tracking-widest">Últimas Fichas Concluídas</h3>
@@ -711,11 +674,9 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* TAB AVALIAÇÃO */}
         {activeTab === 'evaluation' && (
           <div className="h-full max-w-full grid grid-cols-12 gap-4 animate-in fade-in duration-500 overflow-hidden">
             
-            {/* INSTRUTORES E CONSCRITO */}
             <div className="col-span-12 lg:col-span-3 flex flex-col gap-3 overflow-y-auto custom-scrollbar pr-2">
               <section className="bg-zinc-900/50 border border-amber-500/10 rounded-[1.2rem] p-4 space-y-2.5">
                 <div className="flex justify-between items-center">
@@ -764,7 +725,6 @@ const App: React.FC = () => {
               </section>
             </div>
 
-            {/* CIRCUITO DE RAMPAS */}
             <div className="col-span-12 lg:col-span-4 flex flex-col gap-4 overflow-hidden">
               <section className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-5 space-y-3 flex-1 overflow-y-auto custom-scrollbar">
                 <div className="flex justify-between items-center border-b border-white/5 pb-2">
@@ -805,7 +765,6 @@ const App: React.FC = () => {
               </section>
             </div>
 
-            {/* TÚNEL, CHINA E ACOMPANHAMENTOS COM CRONÔMETRO INTERATIVO */}
             <div className="col-span-12 lg:col-span-5 flex flex-col gap-4 overflow-hidden">
               <div className="grid grid-cols-2 gap-3 flex-shrink-0">
                 <div className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-4 space-y-2.5">
@@ -896,7 +855,6 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* TAB PERGUNTAS / PROTOCOLOS */}
         {activeTab === 'protocols' && (
           <div className="max-w-4xl mx-auto h-full flex flex-col gap-4 animate-in fade-in slide-in-from-top-4 duration-500 overflow-hidden">
             <div className="bg-zinc-900/40 border border-white/5 rounded-[2rem] p-8 backdrop-blur-md overflow-hidden flex flex-col h-full shadow-2xl">
@@ -924,7 +882,6 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {/* TAB HISTÓRICO */}
         {activeTab === 'history' && (
           <div className="max-w-5xl mx-auto h-full flex flex-col animate-in fade-in duration-500 overflow-hidden">
             <div className="flex items-center justify-between mb-6 border-b border-white/5 pb-4">
@@ -989,7 +946,6 @@ const App: React.FC = () => {
 
       </main>
 
-      {/* RODAPÉ */}
       <footer className="px-8 py-1.5 border-t border-white/5 bg-black text-[6px] font-black text-slate-600 uppercase tracking-[0.4em] text-center flex-shrink-0">
         GTM - GRUPAMENTO TÁTICO DE MOTOCICLETAS
       </footer>
@@ -1007,5 +963,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-
-```
