@@ -30,13 +30,13 @@ import {
   ArrowRight,
   Award,
   Medal,
-  Wifi
+  Wifi,
+  FolderOpen
 } from 'lucide-react';
 import { RecruitmentState, SavedEvaluation, AIReviewResult } from './types';
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, onValue, set } from "firebase/database";
+import { getDatabase, ref, onValue, set, remove } from "firebase/database";
 
-// CONFIGURAÇÃO DIRETA DO FIREBASE
 const firebaseConfig = {
   apiKey: "AIzaSyA6l96IKSBHh9Kg10Hb0uXWTqNvH4rEq54",
   authDomain: "recrutamento-rocam-96e76.firebaseapp.com",
@@ -50,7 +50,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
 
-const gtmLogo = 'https://i.imgur.com/EZ19Wqm.png';
+const gtmLogo = '/guarnicao_gtm_cinza_camuflado_fundo_transparente_final.png';
 
 interface TimerButtonProps {
   value: string;
@@ -127,7 +127,10 @@ const App: React.FC = () => {
   const [expandedProtocol, setExpandedProtocol] = useState<number | null>(null);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   
+  // Gestão de Múltiplas Fichas em Aberto
   const [sessionId, setSessionId] = useState<string>('GTM-01');
+  const [activeEvaluationsList, setActiveEvaluationsList] = useState<{ [id: string]: { candidateName: string; updatedAt: string } }>({});
+  const [showEvaluationsModal, setShowEvaluationsModal] = useState(false);
 
   const [history, setHistory] = useState<SavedEvaluation[]>(() => {
     try {
@@ -164,6 +167,21 @@ const App: React.FC = () => {
 
   const [isFinishing, setIsFinishing] = useState(false);
 
+  // ESCUTA A LISTA DE TODAS AS FICHAS ABERTAS NO FIREBASE
+  useEffect(() => {
+    const listRef = ref(database, 'active_sessions');
+    const unsubList = onValue(listRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setActiveEvaluationsList(data);
+      } else {
+        setActiveEvaluationsList({});
+      }
+    });
+    return () => unsubList();
+  }, []);
+
+  // ESCUTA EM TEMPO REAL A FICHA DA SALA ATUAL SELECIONADA
   useEffect(() => {
     if (!sessionId.trim()) return;
     const sessionRef = ref(database, `sessions/${sessionId.trim().toUpperCase()}`);
@@ -178,11 +196,20 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, [sessionId]);
 
+  // FUNÇÃO DE ATUALIZAÇÃO DO ESTADO COM SYNC NO FIREBASE E REGISTO NA LISTA GERAL
   const updateStateAndSync = (newState: RecruitmentState) => {
     setState(newState);
     if (sessionId.trim()) {
-      const sessionRef = ref(database, `sessions/${sessionId.trim().toUpperCase()}`);
+      const cleanSessionId = sessionId.trim().toUpperCase();
+      const sessionRef = ref(database, `sessions/${cleanSessionId}`);
       set(sessionRef, newState).catch(err => console.error("Erro ao sincronizar Firebase:", err));
+
+      // Atualiza o índice global das fichas abertas com o nome do candidato
+      const metaRef = ref(database, `active_sessions/${cleanSessionId}`);
+      set(metaRef, {
+        candidateName: newState.candidate.name || 'Candidato sem nome',
+        updatedAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+      }).catch(err => console.error("Erro ao atualizar índice:", err));
     }
   };
 
@@ -310,6 +337,11 @@ const App: React.FC = () => {
     setIsFinishing(false);
     setShowSuccessToast(true);
     
+    // Remove esta ficha ativa do Firebase após concluir
+    const cleanId = sessionId.trim().toUpperCase();
+    remove(ref(database, `sessions/${cleanId}`)).catch(err => console.error(err));
+    remove(ref(database, `active_sessions/${cleanId}`)).catch(err => console.error(err));
+
     const resetState = {
       instructors: state.instructors.map(i => ({...i})), 
       candidate: { id: '', name: '' },
@@ -319,7 +351,8 @@ const App: React.FC = () => {
       tracking: defaultTracking.map(t => ({ ...t, score: 0, time: '' })),
     };
 
-    updateStateAndSync(resetState);
+    setState(resetState);
+    setSessionId('GTM-' + Math.floor(10 + Math.random() * 90));
     setTimeout(() => setShowSuccessToast(false), 3000);
   };
 
@@ -395,9 +428,63 @@ const App: React.FC = () => {
 
   return (
     <div className="h-screen w-full flex flex-col bg-black text-slate-300 overflow-hidden font-sans select-none">
+      
       {showSuccessToast && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[200] bg-amber-500 text-black px-6 py-3 rounded-full font-black uppercase text-[10px] tracking-widest flex items-center gap-3 shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300">
           <CheckCircle2 size={18} /> Avaliação Salva no Histórico GTM!
+        </div>
+      )}
+
+      {/* MODAL DE GESTÃO DE FICHAS EM ABERTO */}
+      {showEvaluationsModal && (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="bg-zinc-950 border border-amber-500/30 p-6 rounded-[2rem] w-full max-w-lg space-y-6 shadow-2xl">
+            <div className="flex justify-between items-center border-b border-white/5 pb-4">
+              <div className="flex items-center gap-3">
+                <FolderOpen className="text-amber-500" size={20} />
+                <h3 className="text-sm font-black text-amber-500 uppercase tracking-widest">Fichas em Andamento (Equipe)</h3>
+              </div>
+              <button onClick={() => setShowEvaluationsModal(false)} className="text-slate-500 hover:text-white"><X size={18}/></button>
+            </div>
+
+            <div className="space-y-3 max-h-64 overflow-y-auto custom-scrollbar pr-1">
+              {Object.keys(activeEvaluationsList).length === 0 ? (
+                <p className="text-center text-[10px] text-slate-600 uppercase py-8 font-bold">Nenhuma outra ficha aberta no momento.</p>
+              ) : (
+                Object.entries(activeEvaluationsList).map(([id, info]) => (
+                  <div key={id} className="bg-zinc-900/60 border border-white/5 rounded-xl p-3 flex items-center justify-between hover:border-amber-500/30 transition-all">
+                    <div>
+                      <span className="text-[8px] font-mono text-amber-500 font-black block">SALA: {id}</span>
+                      <h4 className="text-xs font-bold text-white uppercase mt-0.5">{info.candidateName}</h4>
+                      <span className="text-[7px] text-slate-500 uppercase">Atualizado às {info.updatedAt}</span>
+                    </div>
+                    <button 
+                      onClick={() => {
+                        setSessionId(id);
+                        setShowEvaluationsModal(false);
+                      }}
+                      className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-black uppercase text-[9px] tracking-wider rounded-lg transition-all shadow-md"
+                    >
+                      Aceder Ficha
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-white/5 flex gap-3">
+              <button 
+                onClick={() => {
+                  const newId = 'GTM-' + Math.floor(100 + Math.random() * 900);
+                  setSessionId(newId);
+                  setShowEvaluationsModal(false);
+                }} 
+                className="w-full py-3 bg-amber-500/10 border border-amber-500/30 text-amber-500 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-500/20 transition-all flex items-center justify-center gap-2"
+              >
+                <Plus size={14} /> Criar Nova Ficha em Branco
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -692,11 +779,22 @@ const App: React.FC = () => {
 
         {activeTab === 'evaluation' && (
           <div className="h-full max-w-full flex flex-col gap-3 animate-in fade-in duration-500 overflow-hidden">
+            
+            {/* BARRA DE SALA E GESTÃO DE MÚLTIPLAS FICHAS ABERTAS */}
             <div className="bg-zinc-900/60 border border-amber-500/30 rounded-xl px-4 py-2 flex items-center justify-between shadow-md">
-              <div className="flex items-center gap-2">
-                <Wifi size={14} className="text-green-500 animate-pulse" />
-                <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Sincronização em Tempo Real:</span>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Wifi size={14} className="text-green-500 animate-pulse" />
+                  <span className="text-[10px] font-black text-amber-500 uppercase tracking-widest">Sincronização em Tempo Real</span>
+                </div>
+                <button 
+                  onClick={() => setShowEvaluationsModal(true)}
+                  className="px-3 py-1 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-400 rounded-lg text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5 transition-all"
+                >
+                  <FolderOpen size={12} /> Ver Fichas Abertas ({Object.keys(activeEvaluationsList).length})
+                </button>
               </div>
+
               <div className="flex items-center gap-2">
                 <span className="text-[9px] font-bold text-slate-400 uppercase">CÓDIGO DA SALA:</span>
                 <input 
@@ -947,7 +1045,7 @@ const App: React.FC = () => {
                         </div>
                         <div className="flex gap-2 text-[9px] text-slate-500 font-bold uppercase mt-0.5 items-center">
                           <span className="flex items-center gap-1">
-                            <Users size={10} className="text-amber-500"/> 
+                            <Users size5={10} className="text-amber-500"/> 
                             <span className="text-slate-400">Instrutor:</span>
                             <span className="text-white">{item.state.instructors[0]?.name || 'N/A'}</span>
                           </span>
@@ -965,7 +1063,7 @@ const App: React.FC = () => {
                         <button type="button" className="p-2.5 text-slate-400 hover:text-amber-500 transition-colors bg-white/5 rounded-lg border border-white/5" title="Visualizar">
                           <Eye size={18}/>
                         </button>
-                        <button type="button" onClick={(e) => deleteHistoryEntry(item.id, e)} className="p-2.5 text-slate-400 hover:text-red-500 transition-all bg-white/5 rounded-lg border border-white/5 hover:bg-red-500/10 hover:border-red-500/20 relative z-50" title="Apagar Registro">
+                        <button type="button" onClick={(e) => deleteHistoryEntry(item.id, e)} className="p-2.5 text-slate-400 hover:text-red-500 transition-all bg-white/5 rounded-lg border border-white/5 hover:bg-red-500/10 hover:border-red-500/20 relative z-50" title="Assim que concluído apagar">
                           <Trash2 size={18}/>
                         </button>
                       </div>
