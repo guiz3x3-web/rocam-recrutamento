@@ -31,7 +31,8 @@ import {
   Award,
   Medal,
   Wifi,
-  FolderOpen
+  FolderOpen,
+  Save
 } from 'lucide-react';
 import { RecruitmentState, SavedEvaluation, AIReviewResult } from './types';
 import { initializeApp } from "firebase/app";
@@ -126,8 +127,8 @@ const App: React.FC = () => {
   const [selectedResult, setSelectedResult] = useState<SavedEvaluation | null>(null);
   const [expandedProtocol, setExpandedProtocol] = useState<number | null>(null);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string>('Avaliação Salva com Sucesso!');
   
-  // Gestão de Múltiplas Fichas em Aberto
   const [sessionId, setSessionId] = useState<string>('GTM-01');
   const [activeEvaluationsList, setActiveEvaluationsList] = useState<{ [id: string]: { candidateName: string; updatedAt: string } }>({});
   const [showEvaluationsModal, setShowEvaluationsModal] = useState(false);
@@ -165,9 +166,10 @@ const App: React.FC = () => {
     tracking: defaultTracking,
   });
 
+  const [isSaving, setIsSaving] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);
 
-  // ESCUTA A LISTA DE TODAS AS FICHAS ABERTAS NO FIREBASE
+  // ESCUTA A LISTA DE FICHAS ABERTAS NO FIREBASE
   useEffect(() => {
     const listRef = ref(database, 'active_sessions');
     const unsubList = onValue(listRef, (snapshot) => {
@@ -181,7 +183,7 @@ const App: React.FC = () => {
     return () => unsubList();
   }, []);
 
-  // ESCUTA EM TEMPO REAL A FICHA DA SALA ATUAL SELECIONADA
+  // ESCUTA A SALA ATUAL SELECIONADA
   useEffect(() => {
     if (!sessionId.trim()) return;
     const sessionRef = ref(database, `sessions/${sessionId.trim().toUpperCase()}`);
@@ -196,7 +198,7 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, [sessionId]);
 
-  // FUNÇÃO DE ATUALIZAÇÃO DO ESTADO COM SYNC NO FIREBASE E REGISTO NA LISTA GERAL
+  // FUNÇÃO PARA ATUALIZAR E SINCRONIZAR EM TEMPO REAL
   const updateStateAndSync = (newState: RecruitmentState) => {
     setState(newState);
     if (sessionId.trim()) {
@@ -204,10 +206,9 @@ const App: React.FC = () => {
       const sessionRef = ref(database, `sessions/${cleanSessionId}`);
       set(sessionRef, newState).catch(err => console.error("Erro ao sincronizar Firebase:", err));
 
-      // Atualiza o índice global das fichas abertas com o nome do candidato
       const metaRef = ref(database, `active_sessions/${cleanSessionId}`);
       set(metaRef, {
-        candidateName: newState.candidate.name || 'Candidato sem nome',
+        candidateName: newState.candidate.name || 'Candidato em andamento',
         updatedAt: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
       }).catch(err => console.error("Erro ao atualizar índice:", err));
     }
@@ -309,18 +310,31 @@ const App: React.FC = () => {
     setShowSettings(false);
   };
 
+  // BOTÃO SALVAR: Guarda a ficha atual na nuvem sem fechar/remover
+  const handleSaveOnly = () => {
+    setIsSaving(true);
+    updateStateAndSync(state);
+    setTimeout(() => {
+      setIsSaving(false);
+      setToastMessage('Ficha salva com sucesso!');
+      setShowSuccessToast(true);
+      setTimeout(() => setShowSuccessToast(false), 3000);
+    }, 500);
+  };
+
+  // BOTÃO FINALIZAR: Guarda no histórico definitivo e remove dos ativos
   const handleFinish = async () => {
     if (!state.candidate.name || !state.candidate.id) {
-      alert("ERRO: Nome e ID do conscrito são obrigatórios.");
+      alert("ERRO: Nome e ID do conscrito são obrigatórios para finalizar.");
       return;
     }
 
     setIsFinishing(true);
     
     const instantReview: AIReviewResult = {
-      summary: "Avaliação registrada no banco de dados operacional GTM.",
+      summary: "Avaliação registrada e finalizada no banco de dados operacional GTM.",
       strengths: ["Conformidade operacional", "Execução de manobras"],
-      weaknesses: ["Análise detalhada pendente"],
+      weaknesses: ["Análise detalhada concluída"],
       verdict: isApprovedNow ? 'APROVADO' : 'REPROVADO'
     };
 
@@ -335,9 +349,9 @@ const App: React.FC = () => {
 
     setHistory(prev => [newEntry, ...prev]);
     setIsFinishing(false);
+    setToastMessage('Avaliação Finalizada e Salva no Histórico!');
     setShowSuccessToast(true);
     
-    // Remove esta ficha ativa do Firebase após concluir
     const cleanId = sessionId.trim().toUpperCase();
     remove(ref(database, `sessions/${cleanId}`)).catch(err => console.error(err));
     remove(ref(database, `active_sessions/${cleanId}`)).catch(err => console.error(err));
@@ -383,11 +397,7 @@ const App: React.FC = () => {
       <div className="h-screen w-full flex items-center justify-center bg-[#171717] font-sans select-none relative overflow-hidden">
         <div className="w-full max-w-md p-8 bg-[#1f1f1f] border border-amber-500/40 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] flex flex-col items-center text-center">
           <div className="w-28 h-28 rounded-2xl flex items-center justify-center mb-4">
-            <img 
-              src={gtmLogo} 
-              alt="GTM Logo" 
-              className="w-full h-full object-contain filter drop-shadow-[0_0_12px_rgba(245,158,11,0.2)]" 
-            />
+            <img src={gtmLogo} alt="GTM Logo" className="w-full h-full object-contain filter drop-shadow-[0_0_12px_rgba(245,158,11,0.2)]" />
           </div>
           <h1 className="text-2xl font-black text-amber-500 tracking-wider uppercase mb-1">GTM</h1>
           <h2 className="text-[11px] font-black text-white uppercase tracking-widest mb-1">GRUPAMENTO TÁTICO DE MOTOCICLETAS</h2>
@@ -431,7 +441,7 @@ const App: React.FC = () => {
       
       {showSuccessToast && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[200] bg-amber-500 text-black px-6 py-3 rounded-full font-black uppercase text-[10px] tracking-widest flex items-center gap-3 shadow-2xl animate-in fade-in slide-in-from-top-4 duration-300">
-          <CheckCircle2 size={18} /> Avaliação Salva no Histórico GTM!
+          <CheckCircle2 size={18} /> {toastMessage}
         </div>
       )}
 
@@ -780,7 +790,6 @@ const App: React.FC = () => {
         {activeTab === 'evaluation' && (
           <div className="h-full max-w-full flex flex-col gap-3 animate-in fade-in duration-500 overflow-hidden">
             
-            {/* BARRA DE SALA E GESTÃO DE MÚLTIPLAS FICHAS ABERTAS */}
             <div className="bg-zinc-900/60 border border-amber-500/30 rounded-xl px-4 py-2 flex items-center justify-between shadow-md">
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
@@ -834,24 +843,33 @@ const App: React.FC = () => {
                   <input placeholder="ID / PASSAPORTE" className="w-full bg-black/60 border border-white/5 rounded-lg p-2 text-[10px] font-bold outline-none focus:border-amber-500" value={state.candidate.id} onChange={e => updateStateAndSync({...state, candidate: {...state.candidate, id: e.target.value}})} />
                 </section>
 
-                <section className="bg-zinc-900/50 border border-amber-500/20 rounded-[1.2rem] p-5 flex flex-col gap-3 mt-auto">
-                  <div className="flex justify-between items-start">
+                {/* BOTÕES SEPARADOS DE SALVAR E FINALIZAR */}
+                <section className="bg-zinc-900/50 border border-amber-500/20 rounded-[1.2rem] p-4 flex flex-col gap-2.5 mt-auto">
+                  <div className="flex justify-between items-center">
                     <div>
-                      <span className="text-[9px] font-black text-slate-500 uppercase block mb-1 tracking-widest">Nota Atual</span>
-                      <div className="text-4xl font-sans font-black text-amber-500 tracking-tighter">{finalScore.toFixed(1)}</div>
+                      <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Nota Atual</span>
+                      <div className="text-3xl font-sans font-black text-amber-500 tracking-tighter">{finalScore.toFixed(1)}</div>
                     </div>
                     <div className="text-right">
-                      <span className="text-[9px] font-black text-slate-500 uppercase block mb-1 tracking-widest">Média</span>
+                      <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Média</span>
                       <input type="number" step="0.5" className="w-12 bg-black border border-amber-500/20 rounded-lg p-1 text-center text-amber-500 text-[10px] font-bold outline-none" value={passingGrade} onChange={e => setPassingGrade(parseFloat(e.target.value) || 0)} />
                     </div>
                   </div>
-                  <div className={`w-full py-2 rounded-lg border text-center font-black text-[9px] tracking-[0.2em] ${finalScore >= passingGrade ? 'bg-green-500/10 border-green-500/30 text-green-500' : 'bg-red-500/10 border-red-500/30 text-red-500'}`}>
+
+                  <div className={`w-full py-1.5 rounded-lg border text-center font-black text-[8px] tracking-[0.2em] ${finalScore >= passingGrade ? 'bg-green-500/10 border-green-500/30 text-green-500' : 'bg-red-500/10 border-red-500/30 text-red-500'}`}>
                     {finalScore >= passingGrade ? 'APROVADO' : 'REPROVADO'}
                   </div>
-                  <button onClick={handleFinish} disabled={isFinishing} className="w-full py-3 bg-amber-500 text-black rounded-xl font-black uppercase text-[9px] tracking-widest hover:bg-amber-400 disabled:opacity-50 transition-all flex items-center justify-center gap-2 shadow-lg shadow-amber-500/10">
-                    {isFinishing ? <Loader2 className="animate-spin" size={12}/> : <Shield size={12}/>}
-                    Finalizar e Salvar
-                  </button>
+
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button onClick={handleSaveOnly} disabled={isSaving} className="py-2.5 bg-zinc-800 hover:bg-zinc-700 text-amber-500 border border-amber-500/30 rounded-xl font-black uppercase text-[8px] tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-md">
+                      {isSaving ? <Loader2 className="animate-spin" size={10}/> : <Save size={12}/>}
+                      Salvar Ficha
+                    </button>
+                    <button onClick={handleFinish} disabled={isFinishing} className="py-2.5 bg-amber-500 hover:bg-amber-400 text-black rounded-xl font-black uppercase text-[8px] tracking-wider transition-all flex items-center justify-center gap-1.5 shadow-md shadow-amber-500/10">
+                      {isFinishing ? <Loader2 className="animate-spin" size={10}/> : <Shield size={12}/>}
+                      Finalizar
+                    </button>
+                  </div>
                 </section>
               </div>
 
@@ -1045,7 +1063,7 @@ const App: React.FC = () => {
                         </div>
                         <div className="flex gap-2 text-[9px] text-slate-500 font-bold uppercase mt-0.5 items-center">
                           <span className="flex items-center gap-1">
-                            <Users size5={10} className="text-amber-500"/> 
+                            <Users size={10} className="text-amber-500"/> 
                             <span className="text-slate-400">Instrutor:</span>
                             <span className="text-white">{item.state.instructors[0]?.name || 'N/A'}</span>
                           </span>
@@ -1063,7 +1081,7 @@ const App: React.FC = () => {
                         <button type="button" className="p-2.5 text-slate-400 hover:text-amber-500 transition-colors bg-white/5 rounded-lg border border-white/5" title="Visualizar">
                           <Eye size={18}/>
                         </button>
-                        <button type="button" onClick={(e) => deleteHistoryEntry(item.id, e)} className="p-2.5 text-slate-400 hover:text-red-500 transition-all bg-white/5 rounded-lg border border-white/5 hover:bg-red-500/10 hover:border-red-500/20 relative z-50" title="Assim que concluído apagar">
+                        <button type="button" onClick={(e) => deleteHistoryEntry(item.id, e)} className="p-2.5 text-slate-400 hover:text-red-500 transition-all bg-white/5 rounded-lg border border-white/5 hover:bg-red-500/10 hover:border-red-500/20 relative z-50" title="Apagar Registro">
                           <Trash2 size={18}/>
                         </button>
                       </div>
