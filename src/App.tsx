@@ -33,7 +33,7 @@ import {
 import { RecruitmentState, SavedEvaluation, AIReviewResult } from './types';
 
 // Importação da logo oficial GTM
-import gtmLogo from './guarnicao_gtm_cinza_camuflado_fundo_transparente_final.png';
+import gtmLogo from 'https://imgur.com/a/6ztkBBp';
 
 // --- COMPONENTE REUTILIZÁVEL DE CRONÔMETRO INTERATIVO ---
 interface TimerButtonProps {
