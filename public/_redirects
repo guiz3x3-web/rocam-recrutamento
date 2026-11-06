@@ -1,1 +1,4 @@
 /*    /index.html   200
+git add public/_redirects
+git commit -m "Adiciona redirecionamento SPA Netlify"
+git push
