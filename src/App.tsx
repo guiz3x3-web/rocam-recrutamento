@@ -32,8 +32,8 @@ import {
 } from 'lucide-react';
 import { RecruitmentState, SavedEvaluation, AIReviewResult } from './types';
 
-// Importação da logo oficial GTM
-import gtmLogo from 'https://imgur.com/a/6ztkBBp';
+// Caminho estático direto da pasta public (evita erro de import no build)
+const gtmLogo = '/guarnicao_gtm_cinza_camuflado_fundo_transparente_final.png';
 
 // --- COMPONENTE REUTILIZÁVEL DE CRONÔMETRO INTERATIVO ---
 interface TimerButtonProps {
@@ -189,10 +189,9 @@ const App: React.FC = () => {
   const finalScore = categoryScores.total;
   const isApprovedNow = finalScore >= passingGrade;
 
-  // Estatísticas para o Dashboard
   const stats = useMemo(() => {
     const total = history.length;
-    if (total === 0) return { total: 0, approved: 0, rejected: 0, rate: 0, avgScore: 0 };
+    if (total === 0) return { total: 0, approved: 0, rejected: 0, rate: 0, avgScore: '0.0' };
     const approved = history.filter(h => h.finalScore >= h.passingGrade).length;
     const rejected = total - approved;
     const rate = Math.round((approved / total) * 100);
@@ -271,7 +270,7 @@ const App: React.FC = () => {
     }
   };
 
-  // --- TELA DE LOGIN ESTILIZADA ---
+  // --- TELA DE LOGIN ---
   if (!isAuthenticated) {
     return (
       <div className="h-screen w-full flex items-center justify-center bg-[#171717] font-sans select-none relative overflow-hidden">
