@@ -164,8 +164,8 @@ const App: React.FC = () => {
   ];
 
   const defaultTracking = [
-    { uid: '1', location: 'PRAIA', time: '', score: 0 },
-    { uid: '2', location: 'GROOVE', time: '', score: 0 },
+    { uid: '1', location: 'GROOVE', time: '', score: 0 },
+    { uid: '2', location: 'PRAIA', time: '', score: 0 },
     { uid: '3', location: 'MANSÕES', time: '', score: 0 }
   ];
 
@@ -281,11 +281,9 @@ const App: React.FC = () => {
       return;
     }
     const secs = parseTimeToSeconds(timeStr);
-    let calculatedScore = 0.5;
-    if (secs > 100) {
-      calculatedScore = Math.max(0, 0.5 * (100 / secs));
-    }
-    calculatedScore = Math.round(calculatedScore * 10) / 10;
+    // Túnel com máximo de 2.0 com base em 120s
+    let calculatedScore = Math.min(2.0, Math.max(0, 2.0 * (secs / 120)));
+    calculatedScore = Math.round(calculatedScore * 100) / 100;
 
     updateStateAndSync({
       ...state,
@@ -303,8 +301,8 @@ const App: React.FC = () => {
     }
 
     const secs = parseTimeToSeconds(timeStr);
-    let calculatedScore = Math.min(1.0, Math.max(0, 1.0 * (secs / 90)));
-    calculatedScore = Math.round(calculatedScore * 10) / 10;
+    let calculatedScore = Math.min(1.67, Math.max(0, 1.67 * (secs / 120)));
+    calculatedScore = Math.round(calculatedScore * 100) / 100;
 
     n[idx].time = timeStr;
     n[idx].score = calculatedScore;
@@ -671,7 +669,7 @@ const App: React.FC = () => {
                     <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest block mb-4 border-b border-white/5 pb-2">Circuitos</span>
                     <div className="flex justify-between text-[11px] font-bold uppercase mb-2">
                       <span className="text-slate-500">TÚNEL</span>
-                      <span className="text-amber-500">{(selectedResult?.state?.tunnel?.score || 0).toFixed(1)}</span>
+                      <span className="text-amber-500">{(selectedResult?.state?.tunnel?.score || 0).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-[11px] font-bold uppercase">
                       <span className="text-slate-500">CHINA</span>
@@ -683,7 +681,7 @@ const App: React.FC = () => {
                     {(selectedResult?.state?.tracking || []).map((t, i) => (
                       <div key={i} className="flex justify-between text-[11px] font-bold uppercase mb-1 last:mb-0">
                         <span className="text-slate-500">{t.location || 'SETOR'}</span>
-                        <span className="text-amber-500">{(t.score || 0).toFixed(1)}</span>
+                        <span className="text-amber-500">{(t.score || 0).toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
@@ -1001,11 +999,11 @@ const App: React.FC = () => {
                             type="button"
                             onClick={() => {
                               const n = [...(state?.ramps || [])]; 
-                              n[idx].score = 0.6; 
+                              n[idx].score = 0.3; 
                               updateStateAndSync({...state, ramps: n});
                             }}
-                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${ramp?.score === 0.6 ? 'bg-green-500 text-black shadow-lg scale-105' : 'bg-green-500/20 text-green-500 hover:bg-green-500/30'}`}
-                            title="Acertou (+0,6)"
+                            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase transition-all ${ramp?.score === 0.3 ? 'bg-green-500 text-black shadow-lg scale-105' : 'bg-green-500/20 text-green-500 hover:bg-green-500/30'}`}
+                            title="Acertou (+0,3)"
                           >
                             ✓
                           </button>
@@ -1039,7 +1037,7 @@ const App: React.FC = () => {
                     ].map(item => (
                       <div key={item.label} className="flex justify-between items-center bg-black/40 px-3 py-2 rounded-xl border border-white/5">
                         <span className="text-[8px] font-black text-slate-500 uppercase tracking-tighter flex items-center gap-2">{item.icon} {item.label}</span>
-                        <span className="text-sm font-black text-amber-500 tabular-nums">{item.score.toFixed(1)}</span>
+                        <span className="text-sm font-black text-amber-500 tabular-nums">{item.score.toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
@@ -1049,7 +1047,7 @@ const App: React.FC = () => {
               <div className="col-span-12 lg:col-span-5 flex flex-col gap-4 overflow-hidden">
                 <div className="grid grid-cols-2 gap-3 flex-shrink-0">
                   <div className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-4 space-y-2.5">
-                    <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><Zap size={14}/> TUNEL (Máx 0.5)</h3>
+                    <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><Zap size={14}/> TUNEL (Máx 2.0)</h3>
                     
                     <div className="flex items-center justify-between gap-2 bg-black/60 border border-white/5 rounded-lg px-2.5 py-1.5">
                       <InteractiveTimer 
@@ -1067,12 +1065,12 @@ const App: React.FC = () => {
 
                     <div className="bg-zinc-950 border border-amber-500/40 rounded-lg p-1.5 flex items-center justify-between px-2.5">
                       <span className="text-[8px] font-black text-amber-600 uppercase tracking-tighter">NOTA AUTO:</span>
-                      <span className="text-sm font-black text-amber-400">{(state?.tunnel?.score || 0).toFixed(1)}</span>
+                      <span className="text-sm font-black text-amber-400">{(state?.tunnel?.score || 0).toFixed(2)}</span>
                     </div>
                   </div>
 
                   <div className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-4 space-y-2.5">
-                    <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><Activity size={14}/> MOD. CHINA (Manual)</h3>
+                    <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><Activity size={14}/> MOD. CHINA (Máx 1.0)</h3>
                     
                     <div className="flex items-center justify-between gap-2 bg-black/60 border border-white/5 rounded-lg px-2.5 py-1.5">
                       <InteractiveTimer 
@@ -1090,14 +1088,14 @@ const App: React.FC = () => {
 
                     <div className="bg-zinc-950 border border-amber-500/40 rounded-lg p-1.5 flex items-center justify-between px-2.5">
                       <span className="text-[8px] font-black text-amber-600 uppercase tracking-tighter">NOTA:</span>
-                      <input type="number" step="0.5" className="flex-1 bg-transparent text-sm font-black outline-none text-amber-400 text-center" value={state?.modulation?.score || ''} onChange={e => updateStateAndSync({...state, modulation: {...(state?.modulation || {time:'', score:0}), score: parseFloat(e.target.value) || 0}})} />
+                      <input type="number" step="0.5" max="1.0" className="flex-1 bg-transparent text-sm font-black outline-none text-amber-400 text-center" value={state?.modulation?.score || ''} onChange={e => updateStateAndSync({...state, modulation: {...(state?.modulation || {time:'', score:0}), score: Math.min(1.0, parseFloat(e.target.value) || 0)}})} />
                     </div>
                   </div>
                 </div>
 
                 <section className="bg-zinc-900/30 border border-white/5 rounded-[1.5rem] p-5 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
                   <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                    <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><ClipboardCheck size={14}/> ACOMPANHAMENTOS (Máx 1.0)</h3>
+                    <h3 className="text-[9px] font-black text-amber-500 uppercase tracking-widest flex items-center gap-2"><ClipboardCheck size={14}/> ACOMPANHAMENTOS (Máx 5.0)</h3>
                     <button onClick={() => updateStateAndSync({...state, tracking: [...(state?.tracking || []), {uid:Math.random().toString(), location:'', time:'', score:0}]})} className="p-1.5 bg-amber-500/10 text-amber-500 rounded-lg hover:bg-amber-500/20 transition-all"><Plus size={12}/></button>
                   </div>
                   <div className="space-y-2.5">
@@ -1119,7 +1117,7 @@ const App: React.FC = () => {
                         <div className="flex items-center gap-3 border-l border-white/5 pl-3 ml-3">
                           <div className="flex flex-col items-center bg-zinc-950 border border-amber-500/30 rounded py-1.5 px-3 shadow-inner">
                             <span className="text-[7px] font-black text-amber-600 uppercase mb-0.5 tracking-tighter">NOTA</span>
-                            <span className="text-lg font-black text-amber-400">{(track?.score || 0).toFixed(1)}</span>
+                            <span className="text-lg font-black text-amber-400">{(track?.score || 0).toFixed(2)}</span>
                           </div>
                           <button onClick={() => updateStateAndSync({...state, tracking: (state?.tracking || []).filter(t=>t.uid!==track.uid)})} className="text-slate-700 group-hover:text-red-500 transition-colors"><Trash2 size={12}/></button>
                         </div>
